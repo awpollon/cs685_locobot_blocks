@@ -5,12 +5,8 @@ from interbotix_xs_modules.locobot import InterbotixLocobotXS
 
 
 class BlockBot(InterbotixLocobotXS):
-    def __init__(self):
-        InterbotixLocobotXS.__init__()
-        self.found_tag = False
-        self.initialize_robot()
-
     def initialize_robot(self):
+        self.found_tag = False
         self.camera.move("pan", 0)
         self.camera.move("tilt", 1)
         self.arm.go_to_sleep_pose()
@@ -49,6 +45,7 @@ class BlockBot(InterbotixLocobotXS):
             num_rots += 1
 
     def execute_sequence(self):
+        blockbot.initialize_robot()
         self.rotate_and_find_tag()
 
 
