@@ -12,6 +12,7 @@ class BlockBot(InterbotixLocobotXS):
         self.arm.go_to_sleep_pose()
         self.gripper.close()
         self.gripper.open()
+        self.base.reset_odom()
 
     def get_tag_data(self, data):
         filtered_tags = [det for det in data.detections if det.id[0] in [413, 91]]
