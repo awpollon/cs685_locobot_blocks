@@ -3,10 +3,11 @@ import rospy
 import math
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
-from grab_brick import GrabBrickHere
+from grab_brick import GrabBrick
 
 class TagDetection:
     def __init__(self):
+        self.x_move = 0
         self.found_tag = False
         self.align_tag = False
         self.fine_tune = False
@@ -15,20 +16,27 @@ class TagDetection:
         filtered_tags = [det for det in data.detections if det.id[0] in [413, 91]]
         if len(filtered_tags) > 0:
             tag = filtered_tags[0]
-            print(tag.pose.pose.pose.position)
+            #print(tag.pose.pose.pose.position)
             if self.fine_tune:
-                if -0.002 < tag.pose.pose.pose.position.x < 0.002:
+                print("Finetune")
+                if -0.0001 < tag.pose.pose.pose.position.x < 0.04:
                     self.align_tag = True
-                    subscriber.unregister()
+                    self.x_move = tag.pose.pose.pose.position.y
+                    subscription.unregister()
             else:
-                if -0.02 < tag.pose.pose.pose.position.x < 0.02:
+                if -0.0001 < tag.pose.pose.pose.position.x < 0.04:
                     self.found_tag = True
 
-    def finetune_and_align(self):
-        self.fine_tune = False
+    def finetune_and_align(self, locobot):
+        self.fine_tune = True
         while not rospy.is_shutdown():
             if self.align_tag:
-                GrabBrickHere()
+                print("Z-VALUE: ", self.x_move+0.02)
+                if self.x_move:
+                    GrabBrick(self.x_move)
+                else:
+                    GrabBrick()
+                break
             else:
                 locobot.base.move(0, math.pi/10.0, 1)
                 rospy.sleep(0.7)
@@ -44,7 +52,7 @@ class TagDetection:
             if self.found_tag:
                 #rospy.signal_shutdown("Found the block")
                 print(f"Found the block after {num_rots} rotations")
-                finetune_and_align()
+                self.finetune_and_align(locobot)
                 #rospy.signal_shutdown("Found the block")
 
                 break
