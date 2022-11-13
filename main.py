@@ -1,7 +1,8 @@
 #!/bin/python3
 
-import os
 import math
+import os
+
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 
 
