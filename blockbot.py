@@ -11,17 +11,22 @@ TAGS = [BLOCK_TAG, LANDMARK_TAG, BIN_TAG]
 
 
 class BlockBot(InterbotixLocobotXS):
-    def initialize_robot(self):
+    def __init__(self) -> None:
+        super().__init__("locobot_px100", "mobile_px100")        
         self.found_block = False
         self.block_position = None
-        self.tags_data = []
+        self.base.reset_odom()
 
+        # Track tag detections
+        self.tags_data = []
+        rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag_data)
+
+    def initialize_robot(self):
         self.camera.move("pan", 0)
         self.camera.move("tilt", 1)
         self.arm.go_to_sleep_pose()
         self.gripper.close()
         self.gripper.open()
-        self.base.reset_odom()
 
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
@@ -32,7 +37,6 @@ class BlockBot(InterbotixLocobotXS):
         if len(tags) > 0 and -0.01 < tags[0].pose.pose.pose.position.x < 0.01:
             self.found_block = True
             self.block_position = tags[0].pose.pose.pose.position
-
 
     def grab_block(self):
         base_x = 0
@@ -50,8 +54,6 @@ class BlockBot(InterbotixLocobotXS):
             self.base.move(-base_x, 0, 1)
 
     def rotate_and_find_tag(self):
-        rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag_data)
-
         num_rots = 0
         while not rospy.is_shutdown():
             if self.found_block:
@@ -69,5 +71,5 @@ class BlockBot(InterbotixLocobotXS):
 
 
 if __name__ == "__main__":
-    blockbot = BlockBot("locobot_px100", "mobile_px100")
+    blockbot = BlockBot()
     blockbot.execute_sequence()
