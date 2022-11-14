@@ -36,16 +36,18 @@ class BlockBot(InterbotixLocobotXS):
 
     def grab_block(self):
         base_x = 0
-        if False and abs(self.block_position.z - 4.9) > 1:
-            base_x = 2 * abs(self.block_position.z - 4.9)
-        self.base.move(base_x, math.pi/20, 1)
+        print(self.block_position)
+        if abs(self.block_position.z - 0.5) > 0.01:
+            base_x = 3 * abs(self.block_position.z - 0.5)
+            self.base.move(base_x, 0, 1)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
         self.arm.go_to_home_pose()
         self.gripper.open()
         self.arm.go_to_sleep_pose()
-#        self.base.move(-base_x, 0, 1)
+        if base_x > 0:
+            self.base.move(-base_x, 0, 1)
 
     def rotate_and_find_tag(self):
         rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag_data)
