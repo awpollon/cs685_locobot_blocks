@@ -3,11 +3,19 @@ import rospy
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 
+BLOCK_TAG = 91
+LANDMARK_TAG = 86
+BIN_TAG = 413
+
+TAGS = [BLOCK_TAG, LANDMARK_TAG, BIN_TAG]
+
 
 class BlockBot(InterbotixLocobotXS):
     def initialize_robot(self):
-        self.found_tag = False
-        self.position = None
+        self.found_block = False
+        self.block_position = None
+        self.tags_data = []
+
         self.camera.move("pan", 0)
         self.camera.move("tilt", 1)
         self.arm.go_to_sleep_pose()
@@ -16,33 +24,37 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
 
     def get_tag_data(self, data):
-        filtered_tags = [det for det in data.detections if det.id[0] in [413, 91]]
-        if len(filtered_tags) > 0:
-            tag = filtered_tags[0]
-            if -0.01 < tag.pose.pose.pose.position.x < 0.01:
-                self.found_tag = True
-                self.position = tag.pose.pose.pose.position
-                print(tag.pose.pose.pose.position)
+        self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
+        self.search_block()
+
+    def search_block(self):
+        tags = [tag for tag in self.tags_data if tag.id[0] == BLOCK_TAG]
+        if len(tags) > 0 and -0.01 < tags[0].pose.pose.pose.position.x < 0.01:
+            self.found_block = True
+            self.block_position = tags[0].pose.pose.pose.position
+
 
     def grab_block(self):
         base_x = 0
-        if abs(self.position.z - 4.9) > 1:
-            base_x = 2 * abs(self.position.z - 4.9)
-        self.base.move(base_x, math.pi/20, 1)
+        print(self.block_position)
+        if abs(self.block_position.z - 0.5) > 0.01:
+            base_x = 3 * abs(self.block_position.z - 0.5)
+            self.base.move(base_x, 0, 1)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
         self.arm.go_to_home_pose()
         self.gripper.open()
         self.arm.go_to_sleep_pose()
-        self.base.move(-base_x, 0, 1)
+        if base_x > 0:
+            self.base.move(-base_x, 0, 1)
 
     def rotate_and_find_tag(self):
         rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag_data)
 
         num_rots = 0
         while not rospy.is_shutdown():
-            if self.found_tag:
+            if self.found_block:
                 print(f"Found the block after {num_rots} rotations")
                 self.grab_block()
                 rospy.signal_shutdown("Found the block")
