@@ -3,6 +3,12 @@ import rospy
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 
+BLOCK_TAG = 91
+LANDMARK_TAG = 86
+BIN_TAG = 413
+
+TAGS = [BLOCK_TAG, LANDMARK_TAG, BIN_TAG]
+
 
 class BlockBot(InterbotixLocobotXS):
     def initialize_robot(self):
@@ -16,7 +22,7 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
 
     def get_tag_data(self, data):
-        filtered_tags = [det for det in data.detections if det.id[0] in [413, 91]]
+        filtered_tags = [det for det in data.detections if det.id[0] in TAGS]
         if len(filtered_tags) > 0:
             tag = filtered_tags[0]
             if -0.01 < tag.pose.pose.pose.position.x < 0.01:
