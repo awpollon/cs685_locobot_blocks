@@ -8,18 +8,20 @@ import matplotlib.pyplot as plt
 from matplotlib import patches
 
 
-def plot_point2_on_axes(axes, point, P=None, color=None):
+def plot_point2_on_axes(axes, pose, P=None, color=None):
+    p_x = pose.x()
+    p_y = pose.y()
     if color is not None:
-        axes.plot([point[0]], [point[1]], marker='.', color=color, markersize=8)
+        axes.plot([p_x], [p_y], marker='.', color=color, markersize=8)
     else:
-        axes.plot([point[0]], [point[1]], marker='.', markersize=8)
+        axes.plot([p_x], [p_y], marker='.', markersize=8)
     if P is not None:
         w, v = np.linalg.eigh(P)
         # this corresponds to 95%
         k = 2.447746830681
 
         angle = np.arctan2(v[1, 0], v[0, 0])
-        e1 = patches.Ellipse(point,
+        e1 = patches.Ellipse([p_x, p_y],
                              np.sqrt(w[0]) * 2 * k,
                              np.sqrt(w[1]) * 2 * k,
                              np.rad2deg(angle),
@@ -32,7 +34,7 @@ def plot_result_point2(result, marginals):
     ax = plt.gca()
     for key in result.keys():
         plot_point2_on_axes(
-            ax, result.atPoint2(key), marginals.marginalCovariance(key))
+            ax, result.atPose2(key), marginals.marginalCovariance(key))
 
     plt.axis('equal')
     plt.savefig('localization_prob.png')
@@ -53,34 +55,34 @@ def start_localiztion_demo():
     X = symbol_shorthand.X
 
     # Create noise models
-    PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01], dtype=float))
-    ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01], dtype=float))
-    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.5, 0.5], dtype=float))
+    PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
+    ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
+    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.1, 0.1], dtype=float))
 
     graph = gtsam.NonlinearFactorGraph()
     initial_estimate = gtsam.Values()
 
-    graph.add(gtsam.PriorFactorPoint2(X(0), gtsam.Point2(0, 0), PRIOR_NOISE))
-    initial_estimate.insert(X(0), gtsam.Point2(0, 0))
+    graph.add(gtsam.PriorFactorPose2(X(0), gtsam.Pose2(0, 0, 0), PRIOR_NOISE))
+    initial_estimate.insert(X(0), gtsam.Pose2(0, 0, 0))
 
     result = None
     marginals = None
     # Move in segments
-    odom_history = [(0, 0)]
-    for i in range(5):
+    odom_history = [[0, 0, 0]]
+    for i in range(1):
         time_idx = int(i + 1)
-        bot.base.move(.1, 0, 4)
+        bot.base.move(-.1, 0, 4)
 
         # Process odometry
-        x, y, z = bot.base.get_odom()
+        odom = bot.base.get_odom()
         
-        prev_x, prev_y = odom_history[-1]
-        odom_history.append((x, y))
+        prev_odom = odom_history[-1]
+        odom_history.append(odom)
 
-        dx = x - prev_x
-        dy = y - prev_y
-        graph.add(gtsam.BetweenFactorPoint2(X(time_idx - 1), X(time_idx), gtsam.Point2(dx, dy), ODOMETRY_NOISE))
-        initial_estimate.insert(X(i+1), gtsam.Point2(x, y))
+        d_odom = np.subtract(odom, prev_odom)
+
+        graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx), gtsam.Pose2(d_odom[0], d_odom[1], d_odom[2]), ODOMETRY_NOISE))
+        initial_estimate.insert(X(i+1), gtsam.Pose2(odom[0], odom[1], odom[2]))
 
         # Process any visible landmarks
         landmarks = [tag for tag in bot.tags_data if tag.id[0] == LANDMARK_TAG]
@@ -97,13 +99,13 @@ def start_localiztion_demo():
         result = optimizer.optimize()
         marginals = gtsam.Marginals(graph, result)
 
-        print("Estimated position: ")
-        print(result.atPoint2(X(i+1)))
+        print("Estimated pose: ")
+        print(result.atPose2(X(i+1)))
         print("Covariance:")
         print(marginals.marginalCovariance(X(i+1)))
         print("Odometry measurement")
-        print(x, y)
-        rospy.sleep(2)
+        print(odom)
+        # rospy.sleep(2)
 
     # Printing and Plotting
     plt.figure(figsize=(8, 8))
