@@ -15,6 +15,7 @@ GRABBABLE_MARGIN = [-0.01, 0.01]
 GROUND_INCREMENT = 0.01
 ITERATION_LIMIT = 30
 
+
 class BlockBot(InterbotixLocobotXS):
     def __init__(self) -> None:
         super().__init__("locobot_px100", "mobile_px100")        
