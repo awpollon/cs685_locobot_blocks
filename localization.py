@@ -1,11 +1,13 @@
 import gtsam
 import numpy as np
 from gtsam import symbol_shorthand
-from blockbot import BlockBot, LANDMARK_TAG
+from blockbot import BlockBot, LANDMARK_TAGS
 import rospy
 from apriltag_ros.msg import AprilTagDetectionArray
 import matplotlib.pyplot as plt
 from matplotlib import patches
+import math
+from numpy.random import default_rng
 
 
 def plot_point2_on_axes(axes, pose, P=None, color=None):
@@ -54,10 +56,12 @@ def start_localiztion_demo():
     L = symbol_shorthand.L
     X = symbol_shorthand.X
 
+    bot.camera.tilt(0)
+
     # Create noise models
     PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
     ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
-    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.1, 0.1], dtype=float))
+    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.2], dtype=float))
 
     graph = gtsam.NonlinearFactorGraph()
     initial_estimate = gtsam.Values()
@@ -69,9 +73,10 @@ def start_localiztion_demo():
     marginals = None
     # Move in segments
     odom_history = [[0, 0, 0]]
-    for i in range(1):
+    seen_landmarks = set()
+    for i in range(5):
         time_idx = int(i + 1)
-        bot.base.move(-.1, 0, 4)
+        bot.base.move(.1, 0, 4)
 
         # Process odometry
         odom = bot.base.get_odom()
@@ -85,11 +90,25 @@ def start_localiztion_demo():
         initial_estimate.insert(X(i+1), gtsam.Pose2(odom[0], odom[1], odom[2]))
 
         # Process any visible landmarks
-        landmarks = [tag for tag in bot.tags_data if tag.id[0] == LANDMARK_TAG]
+        landmarks = [tag for tag in bot.tags_data if tag.id[0] in LANDMARK_TAGS]
         for l in landmarks:
-            l_pos = l.pose.pose.pose.position
-            # graph.add(gtsam.BetweenFactorPoint2(X(time_idx)), L(l.id[0]), gtsam.Point2(l_pos.x, l_dy), LANDMARK_NOISE)
+            l_id = l.id[0]
+            tag = l.pose.pose.pose.position
+            # Assume camera is parallel to ground (tilt = 0)
+            # Project the tag position to the camera center
+            l_range = math.sqrt(tag.x**2 + tag.y**2 +tag.z**2)
+            l_bearing = math.atan2(math.sqrt(tag.x**2 + tag.y**2), tag.z)
+            graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id), gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
 
+            # Add estimate for landmark if not seen before
+            if l_id not in seen_landmarks:
+                # TODO: Better estimate based on odom, bearing, and range
+                rng = default_rng()
+                p = rng.normal(loc=0, scale=100, size=(2,))
+                initial_estimate.insert(L(l_id), p)
+                # initial_estimate.insert(L(l_id), gtsam.Pose2(0, 0, 0))
+
+                seen_landmarks.add(l_id)
 
         # Parameters for the optimization
         parameters = gtsam.GaussNewtonParams()
@@ -112,7 +131,8 @@ def start_localiztion_demo():
     # plt.plot(x_true, y_true, ':m', alpha=0.3)
     # plt.plot(landmarks[:, 0], landmarks[:, 1], 'mo', alpha=0.2)
     # print_result_point2(result)
-    plot_result_point2(result, marginals)
+
+    # plot_result_point2(result, marginals)
 
     # # Add the observations for the landmarks
     # for i, landmark in enumerate(landmarks):

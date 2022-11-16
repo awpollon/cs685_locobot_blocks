@@ -4,9 +4,9 @@ from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 
 BLOCK_TAGS = [91, 685]
-LANDMARK_TAG = 86
+LANDMARK_TAGS = [680, 681, 682, 683, 684]
 BIN_TAG = 413
-TAGS = [*BLOCK_TAGS, LANDMARK_TAG, BIN_TAG]
+TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
 ROTATION_ANGLE = math.pi/20.0
 CAMERA_SETTINGS = {"tilt": 1, "pan": 0, "height": 0.45}
