@@ -74,7 +74,7 @@ def start_localiztion_demo():
     # Move in segments
     odom_history = [[0, 0, 0]]
     seen_landmarks = set()
-    for i in range(5):
+    for i in range(6):
         time_idx = int(i + 1)
         bot.base.move(.1, 0, 4)
 
