@@ -31,10 +31,13 @@ GRABBABLE_MARGIN = [-0.01, 0.01]
 
 def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
     MAX_X_VEL = .2
-    MAX_THETA_VEL = math.pi/4
+    MIN_X_VEL = .03
 
-    x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
-    theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
+    MAX_THETA_VEL = math.pi/4
+    MIN_THETA_VEL = math.pi/16
+
+    x_vel = max(MIN_X_VEL, min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL))
+    theta_vel = max(MIN_THETA_VEL, min(K_theta * theta_rel, MAX_THETA_VEL))
 
     # print(x_vel, theta_vel)
     return x_vel, theta_vel
@@ -53,8 +56,8 @@ class BlockBot(InterbotixLocobotXS):
         self.initialize_robot()
 
     def initialize_robot(self):
-        self.camera.move("pan", CAMERA_SETTINGS["pan"])
-        self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
+        # self.camera.move("pan", CAMERA_SETTINGS["pan"])
+        # self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.arm.go_to_sleep_pose()
         self.reset_base_pose()
 
@@ -80,12 +83,13 @@ class BlockBot(InterbotixLocobotXS):
         self.localizer.optmize()
         self.estimated_pose = self.localizer.estimated_pose
 
-        print("Estimated pose: ")
-        print(self.localizer.estimated_pose)
-        print("Covariance:")
-        print(self.localizer.current_covariance)
         print("Odometry measurement")
         print(odom)
+
+        print("Covariance:")
+        print(self.localizer.current_covariance)
+        print("Estimated pose: ")
+        print(self.localizer.estimated_pose)
 
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
@@ -134,12 +138,12 @@ class BlockBot(InterbotixLocobotXS):
 
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         self.action_state = RobotActionState.MOVE_TO_GOAL
-        MAX_MOVES = 1000
-        GOAL_DIST_MARGIN = 0.1
-        GOAL_THETA_MARGIN = 1
+        MAX_MOVES = 100
+        GOAL_DIST_MARGIN = 0.01
+        GOAL_THETA_MARGIN = math.pi/16
         goal_reached = False
 
-        r = rospy.Rate(1)
+        r = rospy.Rate(10)
         
         for i in range(MAX_MOVES):
            
@@ -166,10 +170,13 @@ class BlockBot(InterbotixLocobotXS):
                 theta_rel -= 2 * np.pi
 
             x_vel, theta_vel = calc_velocities(dist, theta_rel)
+            print(f'Velocities: {x_vel} {theta_vel}')
             self.base.command_velocity(x_vel, theta_vel)
             r.sleep()
         
         self.action_state = RobotActionState.WAIT
+        if i+1 == MAX_MOVES:
+            print(f"Moves limit reached:{MAX_MOVES}")
 
     def execute_sequence(self):
         self.find_block()
