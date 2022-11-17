@@ -8,77 +8,85 @@ LANDMARK_TAGS = [680, 681, 682, 683, 684]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
-ROTATION_ANGLE = math.pi/20.0
+ROTATION_INCREMENT = math.pi/20.0
+MOVE_INCREMENT = 0.03
+
 CAMERA_SETTINGS = {"tilt": 1, "pan": 0, "height": 0.45}
-GRABBABLE_APRILTAG_Z = 0.51
+
+GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
-GROUND_INCREMENT = 0.01
-ITERATION_LIMIT = 30
 
 
 class BlockBot(InterbotixLocobotXS):
     def __init__(self) -> None:
-        super().__init__("locobot_px100", "mobile_px100")        
-        self.found_block = False
-        self.block_position = None
-        self.base.reset_odom()
+        super().__init__("locobot_px100", "mobile_px100")
+        rospy.Subscriber("/tag_detections",
+                         AprilTagDetectionArray, self.get_tag_data)
 
-        # Track tag detections
         self.tags_data = []
-        rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag_data)
+        self.block_position = None
+        self.found_block = False
+        self.initialize_robot()
 
+    def initialize_robot(self):
         self.camera.move("pan", CAMERA_SETTINGS["pan"])
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.arm.go_to_sleep_pose()
+        self.reset_base_pose()
+
+        # fix any erroneous gripper positions
         self.gripper.close()
         self.gripper.open()
 
+    def reset_base_pose(self):
+        '''Resets pose estimate, odometry, and GTSAM data. 
+        Call this instead of reset_odom()'''
+        self.estimated_pose = (0, 0, 0)
+        self.base.reset_odom()
+
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
-        self.search_block()
-
-    def search_block(self):
-        tags = [tag for tag in self.tags_data if tag.id[0] in BLOCK_TAGS]
-        if len(tags) > 0 and GRABBABLE_MARGIN[0] < tags[0].pose.pose.pose.position.x < GRABBABLE_MARGIN[1]:
-            self.found_block = True
-            self.block_position = tags[0].pose.pose.pose.position
+        block_tag = [tag for tag in data.detections if tag.id[0] in BLOCK_TAGS]
+        if len(block_tag) > 0:
+            self.block_position = block_tag[0].pose.pose.pose.position
+        else:
+            self.block_position = None
 
     def grab_block(self):
-        dist_moved = 0
-        iter = 0
-        while iter < ITERATION_LIMIT and abs(self.block_position.z - GRABBABLE_APRILTAG_Z) > 0.01: # move 1 cm at a time until the  block is grabbable
-            print("Moving", iter, self.block_position.z, abs(self.block_position.z - GRABBABLE_APRILTAG_Z))
-            self.base.move(GROUND_INCREMENT, 0, 1)
-            dist_moved += GROUND_INCREMENT
-            iter += 1
-            print([t for t in self.tags_data if t.id[0] in TAGS][0].pose.pose.pose.position)
+        self.base.move(0, 2*ROTATION_INCREMENT if self.block_position.x <
+                       0 else 2*ROTATION_INCREMENT, 1)  # TODO: refactor
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
         self.arm.go_to_home_pose()
+        self.base.reset_odom()
+        rospy.sleep(2.5)
         self.gripper.open()
         self.arm.go_to_sleep_pose()
-#        if distance_moved > 0:
-#            self.base.move(-distance_moved, 0, 1)
 
-    def get_ground_distance(april_tag_z):
-        return math.sqrt(april_tag_z**2 - CAMERA_SETTINGS['height']**2)
-
-    def rotate_and_find_tag(self):
-        num_rots = 0
-        while not rospy.is_shutdown() and num_rots < ITERATION_LIMIT:
-            if self.found_block:
-                print(f"Found the block after {num_rots} rotations")
-                self.grab_block()
-                rospy.signal_shutdown("Found the block")
-                break
-            elif num_rots > 0:
-                self.base.move(0, ROTATION_ANGLE, 0.5)
-            num_rots += 1
+    def find_block(self):
+        while not rospy.is_shutdown():
+            if not self.block_position:  # No block in view
+                print("Searching...")
+                self.base.move(0, 2 * ROTATION_INCREMENT, 0.5)
+            else:  # Block in view
+                # Block in grabbable margin
+                if GRABBABLE_MARGIN[0] < self.block_position.x < GRABBABLE_MARGIN[1]:
+                    if abs(self.block_position.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away
+                        print("Aligned. Moving...",
+                              self.block_position.z, self.block_position.x)
+                        self.base.move(MOVE_INCREMENT, 0, 0.5)
+                    else:  # Block is grabbable
+                        print("\n\nPicking...", self.block_position)
+                        self.grab_block()
+                        rospy.signal_shutdown("Found the block")
+                else:  # Block not in grabbable margin
+                    print("Found. Aligning...", self.block_position.x)
+                    self.base.move(
+                        0, ROTATION_INCREMENT if self.block_position.x < 0 else -ROTATION_INCREMENT, 0.5)
 
     def execute_sequence(self):
-        blockbot.initialize_robot()
-        self.rotate_and_find_tag()
+        self.find_block()
 
 
 if __name__ == "__main__":

@@ -46,7 +46,7 @@ def print_result_point2(result, marginals):
     for key in result.keys():
         print(f"Point[{key}]:\n"
               f"  Location: {result.atPoint2(key)}, \n"
-              f"  Covariance: \n{marginals.marginalCovariance(key)}\n" )
+              f"  Covariance: \n{marginals.marginalCovariance(key)}\n")
 
 
 def start_localiztion_demo():
@@ -59,9 +59,12 @@ def start_localiztion_demo():
     bot.camera.tilt(0)
 
     # Create noise models
-    PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
-    ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01, 0.01, 0.01], dtype=float))
-    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.2], dtype=float))
+    PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
+        np.array([0.01, 0.01, 0.01], dtype=float))
+    ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
+        np.array([0.01, 0.01, 0.01], dtype=float))
+    LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
+        np.array([0.1, 0.2], dtype=float))
 
     graph = gtsam.NonlinearFactorGraph()
     initial_estimate = gtsam.Values()
@@ -80,25 +83,31 @@ def start_localiztion_demo():
 
         # Process odometry
         odom = bot.base.get_odom()
-        
+
         prev_odom = odom_history[-1]
         odom_history.append(odom)
 
         d_odom = np.subtract(odom, prev_odom)
 
-        graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx), gtsam.Pose2(d_odom[0], d_odom[1], d_odom[2]), ODOMETRY_NOISE))
-        initial_estimate.insert(X(i+1), gtsam.Pose2(odom[0], odom[1], odom[2]))
+        odom_pose = gtsam.Pose2(d_odom[0], d_odom[1], d_odom[2])
+
+        graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
+                  odom_pose, ODOMETRY_NOISE))
+        initial_estimate.insert(
+            X(time_idx), gtsam.Pose2(odom[0], odom[1], odom[2]))
 
         # Process any visible landmarks
-        landmarks = [tag for tag in bot.tags_data if tag.id[0] in LANDMARK_TAGS]
+        landmarks = [
+            tag for tag in bot.tags_data if tag.id[0] in LANDMARK_TAGS]
         for l in landmarks:
             l_id = l.id[0]
             tag = l.pose.pose.pose.position
             # Assume camera is parallel to ground (tilt = 0)
             # Project the tag position to the camera center
-            l_range = math.sqrt(tag.x**2 + tag.y**2 +tag.z**2)
+            l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2)
             l_bearing = math.atan2(math.sqrt(tag.x**2 + tag.y**2), tag.z)
-            graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id), gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
+            graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id),
+                      gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
 
             # Add estimate for landmark if not seen before
             if l_id not in seen_landmarks:
@@ -114,12 +123,16 @@ def start_localiztion_demo():
         parameters = gtsam.GaussNewtonParams()
         parameters.setRelativeErrorTol(1e-5)
         parameters.setMaxIterations(1000)
-        optimizer = gtsam.GaussNewtonOptimizer(graph, initial_estimate, parameters)
+        optimizer = gtsam.GaussNewtonOptimizer(
+            graph, initial_estimate, parameters)
         result = optimizer.optimize()
         marginals = gtsam.Marginals(graph, result)
 
+        # Update estimated pose
+        bot.estimated_pose = result.atPose2(X(time_idx))
+
         print("Estimated pose: ")
-        print(result.atPose2(X(i+1)))
+        print(bot.estimated_pose)
         print("Covariance:")
         print(marginals.marginalCovariance(X(i+1)))
         print("Odometry measurement")
@@ -140,13 +153,11 @@ def start_localiztion_demo():
     #         (l_dx, l_dy), pose, pose_id = det
     #         graph.add(gtsam.BetweenFactorPoint2(X(int(pose_id)), L(i), gtsam.Point2(l_dx, l_dy), LANDMARK_NOISE))
 
-        # Set the initial position of the landmarks
-        # Note: you can use the positions already stored in each landmark as an initial guess
-        # l_x, l_y = landmark.position
-        # initial_estimate.insert(L(i), gtsam.Point2(l_x, l_y))
+    # Set the initial position of the landmarks
+    # Note: you can use the positions already stored in each landmark as an initial guess
+    # l_x, l_y = landmark.position
+    # initial_estimate.insert(L(i), gtsam.Point2(l_x, l_y))
 
-
-    
     # Get the values of the landmark positions.
     # Note: you don't need to do it like this, but this is how I've done it.
     # I recommend that you use the "symbols" L and X; it makes bookkeeping easier.
@@ -154,6 +165,6 @@ def start_localiztion_demo():
     #     l.position = result.atPoint2(L(lind))
 
     # return result.atPoint2(X(len(dxs))), result, marginals
-
+    
 if __name__ == "__main__":
     start_localiztion_demo()
