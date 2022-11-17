@@ -1,5 +1,6 @@
 import math
 import rospy
+import numpy as np
 from enum import Enum
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
@@ -10,7 +11,7 @@ class RobotActionState(Enum):
     WAIT = 0
     SEARCH_FOR_BLOCK = 1
     PICK_UP_BLOCK = 2
-    TRAVEL_TO_GOAL = 3
+    MOVE_TO_GOAL = 3
     MOVE_FORWARD = 4
 
 
@@ -26,6 +27,17 @@ CAMERA_SETTINGS = {"tilt": 1, "pan": 0, "height": 0.45}
 
 GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
+
+
+def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
+    MAX_X_VEL = .2
+    MAX_THETA_VEL = math.pi/4
+
+    x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
+    theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
+
+    # print(x_vel, theta_vel)
+    return x_vel, theta_vel
 
 
 class BlockBot(InterbotixLocobotXS):
@@ -59,14 +71,14 @@ class BlockBot(InterbotixLocobotXS):
         self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):
-        # Process odometry
+        '''Update localizer with current odometry and observed landmarks'''
         odom = self.base.get_odom()
         landmarks = [
             tag for tag in self.tags_data if tag.id[0] in LANDMARK_TAGS]
 
         self.localizer.add_observation(odom, landmarks)
         self.localizer.optmize()
-        self.localizer.estimated_pose
+        self.estimated_pose = self.localizer.estimated_pose
 
         print("Estimated pose: ")
         print(self.localizer.estimated_pose)
@@ -118,6 +130,45 @@ class BlockBot(InterbotixLocobotXS):
                     print("Found. Aligning...", self.block_position.x)
                     self.base.move(
                         0, ROTATION_INCREMENT if self.block_position.x < 0 else -ROTATION_INCREMENT, 0.5)
+        self.action_state = RobotActionState.WAIT
+
+    def move_to_goal(self, goal_pose=(0, 0, 0)):
+        self.action_state = RobotActionState.MOVE_TO_GOAL
+        MAX_MOVES = 1000
+        GOAL_DIST_MARGIN = 0.1
+        GOAL_THETA_MARGIN = 1
+        goal_reached = False
+
+        r = rospy.Rate(1)
+        
+        for i in range(MAX_MOVES):
+           
+            self.update_position_estimate()
+
+            pos_x = self.estimated_pose.x()
+            pos_y = self.estimated_pose.y()
+            pos_theta = self.estimated_pose.theta()
+
+            (g_x, g_y, g_theta) = goal_pose
+
+            # Check current distance
+            dist = np.sqrt((g_y - pos_y) ** 2 + (g_x - pos_x) ** 2)
+            if abs(dist) <= GOAL_DIST_MARGIN:
+                # Stop moving, rotate to goal pose
+                #TODO: Rotate
+                goal_reached = True
+                break
+
+            theta_rel = np.arctan2(g_y - pos_y, g_x - pos_x) - pos_theta
+            #TODO: Check this
+            theta_rel = theta_rel % (2 * np.pi)
+            if theta_rel > math.pi:
+                theta_rel -= 2 * np.pi
+
+            x_vel, theta_vel = calc_velocities(dist, theta_rel)
+            self.base.command_velocity(x_vel, theta_vel)
+            r.sleep()
+        
         self.action_state = RobotActionState.WAIT
 
     def execute_sequence(self):
