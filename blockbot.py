@@ -44,7 +44,6 @@ class BlockBot(InterbotixLocobotXS):
             self.block_position = tags[0].pose.pose.pose.position
 
     def grab_block(self):
-#        self.base.move(0, ROTATION_ANGLE, 1)
         dist_moved = 0
         iter = 0
         while iter < ITERATION_LIMIT and abs(self.block_position.z - GRABBABLE_APRILTAG_Z) > 0.01: # move 1 cm at a time until the  block is grabbable
@@ -52,7 +51,7 @@ class BlockBot(InterbotixLocobotXS):
             self.base.move(GROUND_INCREMENT, 0, 1)
             dist_moved += GROUND_INCREMENT
             iter += 1
-            print([t for t in self.tags_data if t.id[0] in TAGS])
+            print([t for t in self.tags_data if t.id[0] in TAGS][0].pose.pose.pose.position)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
