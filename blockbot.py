@@ -36,8 +36,8 @@ def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
     MAX_THETA_VEL = math.pi/4
     MIN_THETA_VEL = math.pi/16
 
-    x_vel = max(MIN_X_VEL, min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL))
-    theta_vel = max(MIN_THETA_VEL, min(K_theta * theta_rel, MAX_THETA_VEL))
+    x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
+    theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
 
     # print(x_vel, theta_vel)
     return x_vel, theta_vel
@@ -138,7 +138,7 @@ class BlockBot(InterbotixLocobotXS):
 
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         self.action_state = RobotActionState.MOVE_TO_GOAL
-        MAX_MOVES = 100
+        MAX_MOVES = 500
         GOAL_DIST_MARGIN = 0.01
         GOAL_THETA_MARGIN = math.pi/16
         goal_reached = False
