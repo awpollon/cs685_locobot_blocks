@@ -37,7 +37,7 @@ class BlockBot(InterbotixLocobotXS):
         self.tags_data = []
         self.block_position = None
         self.found_block = False
-        self.action_state - RobotActionState.WAIT
+        self.action_state = RobotActionState.WAIT
         self.initialize_robot()
 
     def initialize_robot(self):

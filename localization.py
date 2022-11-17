@@ -51,85 +51,14 @@ def print_result_point2(result, marginals):
 
 def start_localiztion_demo():
     bot = BlockBot()
-    bot.base.reset_odom()
+    bot.camera.tilt(0)
 
     bot.action_state = RobotActionState.MOVE_FORWARD
 
-    # L = symbol_shorthand.L
-    # X = symbol_shorthand.X
-
-    bot.camera.tilt(0)
-
-    # # Create noise models
-    # PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    #     np.array([0.01, 0.01, 0.01], dtype=float))
-    # ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    #     np.array([0.01, 0.01, 0.01], dtype=float))
-    # LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    #     np.array([0.1, 0.2], dtype=float))
-
-    # graph = gtsam.NonlinearFactorGraph()
-    # initial_estimate = gtsam.Values()
-
-    # graph.add(gtsam.PriorFactorPose2(X(0), gtsam.Pose2(0, 0, 0), PRIOR_NOISE))
-    # initial_estimate.insert(X(0), gtsam.Pose2(0, 0, 0))
-
-    result = None
-    marginals = None
     # Move in segments
-    # odom_history = [[0, 0, 0]]
-    # seen_landmarks = set()
     for i in range(6):
         bot.base.move(.1, 0, 4)
         bot.update_position_estimate()
-
-        # # Process odometry
-        # odom = bot.base.get_odom()
-
-        # prev_odom = odom_history[-1]
-        # odom_history.append(odom)
-
-        # d_odom = np.subtract(odom, prev_odom)
-
-        # odom_pose = gtsam.Pose2(d_odom[0], d_odom[1], d_odom[2])
-
-        # graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
-        #           odom_pose, ODOMETRY_NOISE))
-        # initial_estimate.insert(
-        #     X(time_idx), gtsam.Pose2(odom[0], odom[1], odom[2]))
-
-        # Process any visible landmarks
-        # landmarks = [
-        #     tag for tag in bot.tags_data if tag.id[0] in LANDMARK_TAGS]
-        # for l in landmarks:
-        #     l_id = l.id[0]
-        #     tag = l.pose.pose.pose.position
-        #     # Assume camera is parallel to ground (tilt = 0)
-        #     # Project the tag position to the camera center
-        #     l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2)
-        #     l_bearing = math.atan2(math.sqrt(tag.x**2 + tag.y**2), tag.z)
-        #     graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id),
-        #               gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
-
-            # # Add estimate for landmark if not seen before
-            # if l_id not in seen_landmarks:
-            #     # TODO: Better estimate based on odom, bearing, and range
-            #     rng = default_rng()
-            #     p = rng.normal(loc=0, scale=100, size=(2,))
-            #     initial_estimate.insert(L(l_id), p)
-            #     # initial_estimate.insert(L(l_id), gtsam.Pose2(0, 0, 0))
-
-            #     seen_landmarks.add(l_id)
-
-
-
-        # print("Estimated pose: ")
-        # print(bot.estimated_pose)
-        # print("Covariance:")
-        # print(marginals.marginalCovariance(X(i+1)))
-        # print("Odometry measurement")
-        # print(odom)
-        # rospy.sleep(2)
 
     # Printing and Plotting
     # plt.figure(figsize=(8, 8))
