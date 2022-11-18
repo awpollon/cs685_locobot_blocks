@@ -39,8 +39,21 @@ def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
     x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
     theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
 
+    if theta_rel > math.pi/8:
+        x_vel = 0
+
     # print(x_vel, theta_vel)
     return x_vel, theta_vel
+
+
+def calc_angle_dist(theta_1, theta_2):
+    theta_rel = theta_1 - theta_2
+    #TODO: Check this
+    theta_rel = theta_rel % (2 * np.pi)
+    if theta_rel > math.pi:
+        theta_rel -= 2 * np.pi
+    
+    return theta_rel
 
 
 class BlockBot(InterbotixLocobotXS):
@@ -70,6 +83,8 @@ class BlockBot(InterbotixLocobotXS):
         Call this instead of reset_odom()'''
         self.estimated_pose = (0, 0, 0)
         self.base.reset_odom()
+        rospy.sleep(1)
+        print(f"Reset odom:{self.base.get_odom()}")
         self.localizer = BlockBotLocalizer(self.base.get_odom())
         self.estimated_pose = self.localizer.estimated_pose
 
@@ -98,6 +113,18 @@ class BlockBot(InterbotixLocobotXS):
             self.block_position = block_tag[0].pose.pose.pose.position
         else:
             self.block_position = None
+
+    def move(self, x=0, yaw=0, duration=1.0):
+        '''Adapted from Interbotix API, but adding localization'''
+        time_start = rospy.get_time()
+        r = rospy.Rate(10)
+        # Publish Twist at 10 Hz for duration
+        while (rospy.get_time() < (time_start + duration)):
+            self.update_position_estimate()
+            self.base.command_velocity(x, yaw)
+            r.sleep()
+        # After the duration has passed, stop
+        self.base.command_velocity(0, 0)
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
@@ -140,7 +167,7 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.MOVE_TO_GOAL
         MAX_MOVES = 500
         GOAL_DIST_MARGIN = 0.01
-        GOAL_THETA_MARGIN = math.pi/16
+        GOAL_THETA_MARGIN = math.pi/32
         goal_reached = False
 
         r = rospy.Rate(10)
@@ -159,17 +186,19 @@ class BlockBot(InterbotixLocobotXS):
             dist = np.sqrt((g_y - pos_y) ** 2 + (g_x - pos_x) ** 2)
             if abs(dist) <= GOAL_DIST_MARGIN:
                 # Stop moving, rotate to goal pose
-                #TODO: Rotate
-                goal_reached = True
-                break
+                pose_theta_diff = calc_angle_dist(g_theta, pos_theta)
+                print(f'Pose theta diff {pose_theta_diff}')
+                if abs(pose_theta_diff) <= GOAL_THETA_MARGIN:
+                    goal_reached = True
+                    break
 
-            theta_rel = np.arctan2(g_y - pos_y, g_x - pos_x) - pos_theta
-            #TODO: Check this
-            theta_rel = theta_rel % (2 * np.pi)
-            if theta_rel > math.pi:
-                theta_rel -= 2 * np.pi
+                # Set velcoities to rotate to correct pose
+                x_vel, theta_vel = calc_velocities(0, pose_theta_diff)
 
-            x_vel, theta_vel = calc_velocities(dist, theta_rel)
+            else:
+                theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
+                x_vel, theta_vel = calc_velocities(dist, theta_rel)
+
             print(f'Velocities: {x_vel} {theta_vel}')
             self.base.command_velocity(x_vel, theta_vel)
             r.sleep()

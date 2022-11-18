@@ -53,7 +53,15 @@ def start_localiztion_demo():
     bot = BlockBot()
     bot.camera.tilt(0)
 
-    bot.move_to_goal((.1, 0, 0))
+    bot.move(.2, 0, 2)
+    bot.move(0, math.pi/4, 2)
+    bot.move(.2, 0, 2)
+    bot.move(0, math.pi/4, 2)
+    bot.move(.2, 0, 2)
+
+
+
+    # bot.move_to_goal((.1, 0, 0))
 
     # bot.action_state = RobotActionState.MOVE_FORWARD
 

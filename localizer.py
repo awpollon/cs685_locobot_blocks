@@ -10,7 +10,7 @@ X = symbol_shorthand.X
 PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.01, 0.01, 0.01], dtype=float))
 ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.01, 0.01, 0.01], dtype=float))
+    np.array([0.1, 0.1, 1], dtype=float))
 LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.1, 0.2], dtype=float))
 
@@ -43,11 +43,18 @@ class BlockBotLocalizer:
         # Add odometry measurement
         prev_odom = self.odom_history[-1]
         self.odom_history.append(odom)
+        dx, dy, dtheta = np.subtract(odom, prev_odom)
 
-        d_odom = np.subtract(odom, prev_odom)
-        odom_rel_pose = gtsam.Pose2(d_odom[0], d_odom[1], d_odom[2])
+        prev_theta = prev_odom[2]
+        rel_x = dx * np.cos(prev_theta) + dy * np.sin(prev_theta)
+        rel_y = dx * np.sin(-prev_theta) + dy * np.cos(prev_theta)
+
+        odom_rel_pose = gtsam.Pose2(rel_x, rel_y, dtheta)
+        print(f'Rel pose: {odom_rel_pose}')
         self.graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
                        odom_rel_pose, ODOMETRY_NOISE))
+
+        # self.initial_estimate.insert(X(time_idx), gtsam.Pose2(0, 0, 0))
 
         self.initial_estimate.insert(
             X(time_idx), gtsam.Pose2(odom[0], odom[1], odom[2]))
