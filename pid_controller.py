@@ -16,11 +16,11 @@ class LocobotPIDController:
         self.KP_vel = 0.3
         self.KP_theta = 0.5
 
-        self.KI_vel = 0.1
-        self.KI_theta = 0.1
+        self.KI_vel = 0
+        self.KI_theta = 0
 
-        self.KD_vel = 0.1
-        self.KD_theta = 0.1
+        self.KD_vel = 0
+        self.KD_theta = 0git s
         
         self.x_it = 0
         self.theta_it = 0
