@@ -5,6 +5,7 @@ from enum import Enum
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 from localizer import BlockBotLocalizer
+from locobot_controller import LocobotController
 
 
 class RobotActionState(Enum):
@@ -169,41 +170,13 @@ class BlockBot(InterbotixLocobotXS):
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         self.action_state = RobotActionState.MOVE_TO_GOAL
         MAX_MOVES = 500
-        GOAL_DIST_MARGIN = 0.01
-        GOAL_THETA_MARGIN = math.pi/32
-        goal_reached = False
 
         r = rospy.Rate(10)
+
+        controller = LocobotController(self, goal_pose)
         
         for i in range(MAX_MOVES):
-           
-            self.update_position_estimate()
-
-            pos_x = self.estimated_pose.x()
-            pos_y = self.estimated_pose.y()
-            pos_theta = self.estimated_pose.theta()
-
-            (g_x, g_y, g_theta) = goal_pose
-
-            # Check current distance
-            dist = np.sqrt((g_y - pos_y) ** 2 + (g_x - pos_x) ** 2)
-            if abs(dist) <= GOAL_DIST_MARGIN:
-                # Stop moving, rotate to goal pose
-                pose_theta_diff = calc_angle_dist(g_theta, pos_theta)
-                print(f'Pose theta diff {pose_theta_diff}')
-                if abs(pose_theta_diff) <= GOAL_THETA_MARGIN:
-                    goal_reached = True
-                    break
-
-                # Set velcoities to rotate to correct pose
-                x_vel, theta_vel = calc_velocities(0, pose_theta_diff)
-
-            else:
-                theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
-                x_vel, theta_vel = calc_velocities(dist, theta_rel)
-
-            print(f'Velocities: {x_vel} {theta_vel}')
-            self.base.command_velocity(x_vel, theta_vel)
+            controller.step()
             r.sleep()
         
         self.action_state = RobotActionState.WAIT
