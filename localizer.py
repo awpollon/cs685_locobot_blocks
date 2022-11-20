@@ -15,11 +15,26 @@ LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.1, 0.2], dtype=float))
 
 
+def calc_pos_from_bearing_range(pose, l_bearing, l_range):
+    # Calc relative x and y from robot pose
+    dx = l_range * np.cos(l_bearing)
+    dy = l_range * np.sin(l_bearing)
+
+    # roate opposite robot pose to get absolute dx and dy from pose
+    r_x, r_y, r_theta = pose
+    l_x = r_x + (dx * np.cos(-r_theta) + dy * np.sin(-r_theta))
+    l_y = r_y + (dx * np.sin(r_theta) + dy * np.cos((-r_theta)))
+
+    l_theta = r_theta + l_bearing
+
+    return (l_x, l_y, l_theta)
+
+
 class BlockBotLocalizer:
     def __init__(self, start=(0, 0, 0)) -> None:
         # Track pose id index
         self.current_idx = 0
-        self.use_landmarks = False
+        self.use_landmarks = True
 
         self.seen_landmarks = set()
         self.odom_history = [start]
@@ -54,8 +69,6 @@ class BlockBotLocalizer:
         self.graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
                        odom_rel_pose, ODOMETRY_NOISE))
 
-        # self.initial_estimate.insert(X(time_idx), gtsam.Pose2(0, 0, 0))
-
         self.initial_estimate.insert(
             X(time_idx), gtsam.Pose2(odom[0], odom[1], odom[2]))
 
@@ -74,11 +87,10 @@ class BlockBotLocalizer:
 
                 # Add estimate for landmark if not seen before
                 if l_id not in self.seen_landmarks:
-                    # TODO: Better estimate based on odom, bearing, and range
-                    # rng = default_rng()
-                    # p = rng.normal(loc=0, scale=100, size=(2,))
-                    # initial_estimate.insert(L(l_id), p)
-                    self.initial_estimate.insert(L(l_id), gtsam.Pose2(0, 0, 0))
+                    # Estimate landmark pos based on current odometry
+                    l_pose = calc_pos_from_bearing_range(odom, l_range, l_bearing )
+
+                    self.initial_estimate.insert(L(l_id), gtsam.Point2(l_pose[0], l_pose[1]))
 
                     self.seen_landmarks.add(l_id)
 
@@ -95,3 +107,10 @@ class BlockBotLocalizer:
         # Update estimated pose
         self.estimated_pose = result.atPose2(X(self.current_idx))
         self.current_covariance = marginals.marginalCovariance(X(self.current_idx))
+
+
+if __name__ == "__main__":
+    p = (4, 1.5, 7 * math.pi/18)
+    l_range = 3
+    l_bearing = -5 * math.pi/18
+    calc_pos_from_bearing_range(p, l_bearing, l_range)

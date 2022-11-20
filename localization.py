@@ -54,9 +54,9 @@ def start_localiztion_demo():
     bot.camera.tilt(0)
 
     bot.move(.2, 0, 2)
-    bot.move(0, math.pi/4, 2)
+    # bot.move(0, math.pi/4, 2)
     bot.move(.2, 0, 2)
-    bot.move(0, math.pi/4, 2)
+    # bot.move(0, math.pi/4, 2)
     bot.move(.2, 0, 2)
 
 
