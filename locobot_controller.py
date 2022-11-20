@@ -2,22 +2,7 @@ import math
 from blockbot import BlockBot
 import numpy as np
 
-
-def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
-    MAX_X_VEL = .2
-    MIN_X_VEL = .03
-
-    MAX_THETA_VEL = math.pi/4
-    MIN_THETA_VEL = math.pi/16
-
-    x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
-    theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
-
-    if theta_rel > math.pi/8:
-        x_vel = 0
-
-    # print(x_vel, theta_vel)
-    return x_vel, theta_vel
+from pid_controller import LocobotPIDController
 
 
 def calc_angle_dist(theta_1, theta_2):
@@ -40,6 +25,10 @@ class LocobotController():
         self.bot = locobot
         self.goal_reached = False
         self.goal_pose = goal_pose
+
+        self.heading_controller = LocobotPIDController()
+        self.movement_controller = LocobotPIDController()
+        self.pose_angle_controller = LocobotPIDController()
 
     def set_goal(self, goal_pose):
         self.goal_pose = goal_pose
@@ -71,31 +60,19 @@ class LocobotController():
                 return
 
             else:
-                self.__rotate_only(pose_theta_diff)
+                self.pose_angle_controller.step(0, pose_theta_diff)
         else:
             # Still not at goal position
             theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
             if theta_rel > self.HEADING_THRESHOLD:
                 # Only rotate towards goal
-                self.__rotate_only(theta_rel)
+                self.heading_controller.step(0, theta_rel)
             else:
                 # Move towards goal position, adjusting for small heading errors
-                self.__move_towards_goal(dist, theta_rel)
-
-    def __rotate_only(self, theta_rel):
-        _, theta_vel = calc_velocities(0, theta_rel)
-        self.command(0, theta_vel)
-    
-    def __move(self, dist, theta_rel):
-        x_vel, theta_vel = calc_velocities(dist, theta_rel)
-        self.command(x_vel, theta_vel)
+                self.movement_controller.step(dist, theta_rel)
 
     def __stop(self):
-        self.command(0, 0)
-
-    def __command(self, x_vel, theta_vel):
-        print(f'Velocities: {x_vel} {theta_vel}')
-        self.bot.base.command_velocity(x_vel, theta_vel)
+        self.bot.base.command_velocity(0, 0)
 
     def euclidean_distanced_to_goal(self):
         (g_x, g_y, _) = self.goal_pose
