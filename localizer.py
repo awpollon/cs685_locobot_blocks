@@ -10,15 +10,15 @@ X = symbol_shorthand.X
 PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.01, 0.01, 0.01], dtype=float))
 ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.1, 0.1, 1], dtype=float))
+    np.array([0.1, 0.1, math.pi/8], dtype=float))
 LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.1, 0.2], dtype=float))
+    np.array([0.5, 0.5], dtype=float))
 
 
 def calc_pos_from_bearing_range(pose, l_bearing, l_range):
     # Calc relative x and y from robot pose
-    dx = l_range * np.cos(l_bearing)
-    dy = l_range * np.sin(l_bearing)
+    dx = l_range * np.sin(l_bearing)
+    dy = l_range * np.cos(l_bearing)
 
     # roate opposite robot pose to get absolute dx and dy from pose
     r_x, r_y, r_theta = pose
@@ -35,6 +35,7 @@ class BlockBotLocalizer:
         # Track pose id index
         self.current_idx = 0
         self.use_landmarks = True
+        self.debug = True
 
         self.seen_landmarks = set()
         self.odom_history = [start]
@@ -49,7 +50,7 @@ class BlockBotLocalizer:
         self.initial_estimate.insert(X(self.current_idx), start_pose)
         self.optmize()
 
-    def add_observation(self, odom, landmarks=[], time_idx=None):
+    def add_observation(self, odom, landmarks=[], camera_tilt=0.0, time_idx=None):
         '''Adds a new observation. Increments time index unless one is provided'''
         if time_idx is None:
             self.current_idx += 1
@@ -79,19 +80,26 @@ class BlockBotLocalizer:
                 tag = l.pose.pose.pose.position
                 # Assume camera is parallel to ground (tilt = 0)
                 # TODO: adjust for camera tilt
+
                 # Project the tag position to the camera center
-                l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2)
+                l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
                 l_bearing = math.atan2(math.sqrt(tag.x**2 + tag.y**2), tag.z)
+
+                if tag.x > 0:
+                    l_bearing *= -1
+                    
                 self.graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id),
                             gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
+
+                print(f'Landmark {l_id} range: {l_range} bearing: {l_bearing}')
+                print(f'Raw z: {tag.z},x: {tag.x} y: {tag.y}')
 
                 # Add estimate for landmark if not seen before
                 if l_id not in self.seen_landmarks:
                     # Estimate landmark pos based on current odometry
-                    l_pose = calc_pos_from_bearing_range(odom, l_range, l_bearing )
-
+                    l_pose = calc_pos_from_bearing_range(odom, l_bearing, l_range)
                     self.initial_estimate.insert(L(l_id), gtsam.Point2(l_pose[0], l_pose[1]))
-
+                    print(f'Initial estimate for {l_id}: {l_pose[0]}, {l_pose[1]}')
                     self.seen_landmarks.add(l_id)
 
     def optmize(self):

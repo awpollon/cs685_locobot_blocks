@@ -16,7 +16,7 @@ class RobotActionState(Enum):
 
 
 BLOCK_TAGS = [91, 685]
-LANDMARK_TAGS = [680, 681, 682, 683, 684]
+LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
@@ -94,7 +94,9 @@ class BlockBot(InterbotixLocobotXS):
         landmarks = [
             tag for tag in self.tags_data if tag.id[0] in LANDMARK_TAGS]
 
-        self.localizer.add_observation(odom, landmarks)
+        # tilt downward is postive
+        camera_tilt = -self.camera.info['tilt']['command']
+        self.localizer.add_observation(odom, landmarks, camera_tilt)
         self.localizer.optmize()
         self.estimated_pose = self.localizer.estimated_pose
 
@@ -116,6 +118,7 @@ class BlockBot(InterbotixLocobotXS):
 
     def move(self, x=0, yaw=0, duration=1.0):
         '''Adapted from Interbotix API, but adding localization'''
+        print(f'Moving x={x} yaw={yaw}, dur={duration}')
         time_start = rospy.get_time()
         r = rospy.Rate(10)
         # Publish Twist at 10 Hz for duration
@@ -213,4 +216,5 @@ class BlockBot(InterbotixLocobotXS):
 
 if __name__ == "__main__":
     blockbot = BlockBot()
-    blockbot.execute_sequence()
+    blockbot.update_position_estimate()
+    # blockbot.execute_sequence()
