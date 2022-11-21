@@ -17,8 +17,8 @@ LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
 
 def calc_pos_from_bearing_range(pose, l_bearing, l_range):
     # Calc relative x and y from robot pose
-    dx = l_range * np.sin(l_bearing)
-    dy = l_range * np.cos(l_bearing)
+    dx = l_range * np.cos(l_bearing)
+    dy = l_range * np.sin(l_bearing)
 
     # roate opposite robot pose to get absolute dx and dy from pose
     r_x, r_y, r_theta = pose
@@ -78,8 +78,6 @@ class BlockBotLocalizer:
             for l in landmarks:
                 l_id = l.id[0]
                 tag = l.pose.pose.pose.position
-                # Assume camera is parallel to ground (tilt = 0)
-                # TODO: adjust for camera tilt
 
                 # Project the tag position to the camera center
                 l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
