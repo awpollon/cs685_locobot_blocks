@@ -31,17 +31,29 @@ def calc_pos_from_bearing_range(pose, l_bearing, l_range):
 
 
 def calc_bearing_range_from_tag(tag, camera_tilt):
-    # Project the tag position to the camera center
-    t_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
+    '''Takes AprilTag detection data and calculates a bearing and range,
+    taking into account the tilt of the camera.'''
+    # Tag data (in meters)
+    # z = distance to center of tag to center of camera
+    # x = real horizontal distance from camera center, left relative to robot is postive
+    # y = real vertical distance from camera center, down is positive
 
+    # Project the tag position to the camera center
     length_to_camera_center = math.sqrt(tag.x**2 + tag.y**2)
+    
+    # Now project so parallel to the ground based on camera tilt
+    t_range = math.sqrt(length_to_camera_center + tag.z**2) * np.cos(camera_tilt)
+
+    # For bearing, need signed value of length to center
     # x > 0 is clockwise from camera center
     if tag.x > 0:
         length_to_camera_center *= -1
 
+    # Find the bearing angle from camera to tag
     t_bearing = math.atan2(length_to_camera_center, tag.z)
     
     return t_bearing, t_range
+
 
 class BlockBotLocalizer:
     def __init__(self, start=(0, 0, 0), use_landmarks=True) -> None:
@@ -70,14 +82,20 @@ class BlockBotLocalizer:
             time_idx = self.current_idx
 
         # Add odometry measurement
+
+        # Retreive previous odometry measurement
         prev_odom = self.odom_history[-1]
         self.odom_history.append(odom)
+
+        # Find the change in global coordinates and pose
         dx, dy, dtheta = np.subtract(odom, prev_odom)
 
+        # Rotate to find the change relative to the previous pose
         prev_theta = prev_odom[2]
         rel_x = dx * np.cos(prev_theta) + dy * np.sin(prev_theta)
         rel_y = dx * np.sin(-prev_theta) + dy * np.cos(prev_theta)
 
+        # Add to factor graph and set initial estimate for current Pose
         odom_rel_pose = gtsam.Pose2(rel_x, rel_y, dtheta)
         print(f'Rel pose: {odom_rel_pose}')
         self.graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
@@ -90,6 +108,8 @@ class BlockBotLocalizer:
         if self.use_landmarks:
             for l in landmarks:
                 l_id = l.id[0]
+
+                # Get the tag data and calculate bearing and range relative to Robot pose
                 tag = l.pose.pose.pose.position
 
                 l_bearing, l_range = calc_bearing_range_from_tag(tag, camera_tilt)
@@ -124,10 +144,3 @@ class BlockBotLocalizer:
         # Update estimated pose
         self.estimated_pose = result.atPose2(X(self.current_idx))
         self.current_covariance = marginals.marginalCovariance(X(self.current_idx))
-
-
-if __name__ == "__main__":
-    p = (4, 1.5, 7 * math.pi/18)
-    l_range = 3
-    l_bearing = -5 * math.pi/18
-    calc_pos_from_bearing_range(p, l_bearing, l_range)
