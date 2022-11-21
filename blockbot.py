@@ -184,7 +184,7 @@ class BlockBot(InterbotixLocobotXS):
                     camera_tilt = self.get_camera_tilt()
                     block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
 
-                    est_block_x, est_block_y, _ = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
+                    est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
                     
                     print(f"Block estimated at {est_block_x}, {est_block_y}")
 
