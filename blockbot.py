@@ -4,7 +4,7 @@ import numpy as np
 from enum import Enum
 from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
-from localizer import BlockBotLocalizer, calc_pos_from_bearing_range
+from localizer import BlockBotLocalizer, calc_pos_from_bearing_range, calc_bearing_range_from_tag
 from locobot_controller import LocobotController
 
 
@@ -25,7 +25,7 @@ BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
 ROTATION_INCREMENT = math.pi/20.0
-MOVE_INCREMENT = 0.03
+MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 4*math.pi/16, "pan": 0, "height": 0.45}
 
@@ -182,14 +182,13 @@ class BlockBot(InterbotixLocobotXS):
                     self.action_state = RobotActionState.TRAVEL_TO_BLOCK
 
                     camera_tilt = self.get_camera_tilt()
-                    block_range = math.sqrt(pos.x**2 + pos.y**2 + pos.z**2) * np.cos(camera_tilt)
-                    block_bearing = math.atan2(math.sqrt(pos.x**2 + pos.y**2), pos.z)
+                    block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
 
                     est_block_x, est_block_y, _ = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
                     
                     print(f"Block estimated at {est_block_x}, {est_block_y}")
 
-                    stop_dist = .20
+                    stop_dist = .17
                     dx = stop_dist * np.cos(block_bearing)
                     dy = stop_dist * np.sin(block_bearing)
 

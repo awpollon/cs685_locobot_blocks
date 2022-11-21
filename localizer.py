@@ -30,6 +30,19 @@ def calc_pos_from_bearing_range(pose, l_bearing, l_range):
     return (l_x, l_y, l_theta)
 
 
+def calc_bearing_range_from_tag(tag, camera_tilt):
+    # Project the tag position to the camera center
+    t_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
+
+    length_to_camera_center = math.sqrt(tag.x**2 + tag.y**2)
+    # x > 0 is clockwise from camera center
+    if tag.x > 0:
+        length_to_camera_center *= -1
+
+    t_bearing = math.atan2(length_to_camera_center, tag.z)
+    
+    return t_bearing, t_range
+
 class BlockBotLocalizer:
     def __init__(self, start=(0, 0, 0), use_landmarks=True) -> None:
         # Track pose id index
@@ -79,9 +92,7 @@ class BlockBotLocalizer:
                 l_id = l.id[0]
                 tag = l.pose.pose.pose.position
 
-                # Project the tag position to the camera center
-                l_range = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
-                l_bearing = math.atan2(math.sqrt(tag.x**2 + tag.y**2), tag.z)
+                l_bearing, l_range = calc_bearing_range_from_tag(tag, camera_tilt)
 
                 if tag.x > 0:
                     l_bearing *= -1
