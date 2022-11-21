@@ -14,6 +14,7 @@ class RobotActionState(Enum):
     PICK_UP_BLOCK = 2
     MOVE_TO_GOAL = 3
     MOVE_FORWARD = 4
+    RELEASE_BLOCK = 5
 
 
 BLOCK_TAGS = [91, 685]
@@ -63,22 +64,24 @@ def calc_angle_dist(theta_1, theta_2):
 
 
 class BlockBot(InterbotixLocobotXS):
-    def __init__(self) -> None:
+    def __init__(self, align_camera=False) -> None:
         super().__init__("locobot_px100", "mobile_px100")
         rospy.Subscriber("/tag_detections",
                          AprilTagDetectionArray, self.get_tag_data)
 
         self.tags_data = []
         self.block_position = None
+        self.bin_position = None
         self.found_block = False
         self.controller = LocobotController()
 
         self.action_state = RobotActionState.WAIT
-        self.initialize_robot()
+        self.initialize_robot(align_camera)
 
-    def initialize_robot(self):
-        # self.camera.move("pan", CAMERA_SETTINGS["pan"])
-        # self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
+    def initialize_robot(self, align_camera):
+        if align_camera:
+            self.camera.move("pan", CAMERA_SETTINGS["pan"])
+            self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.arm.go_to_sleep_pose()
         self.reset_base_pose()
 
@@ -119,11 +122,18 @@ class BlockBot(InterbotixLocobotXS):
 
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
+
         block_tag = [tag for tag in data.detections if tag.id[0] in BLOCK_TAGS]
         if len(block_tag) > 0:
             self.block_position = block_tag[0].pose.pose.pose.position
         else:
             self.block_position = None
+
+        bin_tag = [tag for tag in data.detections if tag.id[0] == BIN_TAG]
+        if len(bin_tag) > 0:
+            self.bin_position = bin_tag[0].pose.pose.pose.position
+        else:
+            self.bin_position = None
 
     def move(self, x=0, yaw=0, duration=1.0):
         '''Adapted from Interbotix API, but adding localization'''
@@ -140,39 +150,41 @@ class BlockBot(InterbotixLocobotXS):
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
-        self.base.move(0, 2*ROTATION_INCREMENT if self.block_position.x <
-                       0 else 2*ROTATION_INCREMENT, 1)  # TODO: refactor
+        self.base.move(0, 2*ROTATION_INCREMENT, 1)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
-        self.arm.go_to_home_pose()
-        self.base.reset_odom()
-        rospy.sleep(2.5)
-        self.gripper.open()
         self.arm.go_to_sleep_pose()
         self.action_state = RobotActionState.WAIT
 
-    def find_block(self):
+    def release_block(self):
+        self.action_state = RobotActionState.RELEASE_BLOCK
+        self.arm.go_to_home_pose()
+        self.base.move(0.15, 0, 1)
+        self.gripper.open()
+        self.base.move(-0.15, 0, 1)
+        self.arm.go_to_sleep_pose()
+        self.action_state = RobotActionState.WAIT
+
+    def find_goal(self, type="block"):
         self.action_state = RobotActionState.SEARCH_FOR_BLOCK
-        while not rospy.is_shutdown():
-            if not self.block_position:  # No block in view
-                print("Searching...")
+        for _ in range(500):
+            if type == "block":
+                pos = self.block_position
+            elif type == "bin":
+                pos = self.bin_position
+
+            if not pos:  # No block in view
                 self.base.move(0, 2 * ROTATION_INCREMENT, 0.5)
             else:  # Block in view
-                # Block in grabbable margin
-                if GRABBABLE_MARGIN[0] < self.block_position.x < GRABBABLE_MARGIN[1]:
-                    if abs(self.block_position.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away
-                        print("Aligned. Moving...",
-                              self.block_position.z, self.block_position.x)
+                if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]: # Block in grabbable margin
+                    if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away
                         self.base.move(MOVE_INCREMENT, 0, 0.5)
                     else:  # Block is grabbable
-                        print("\n\nPicking...", self.block_position)
-                        self.grab_block()
-                        rospy.signal_shutdown("Found the block")
+                        return True
                 else:  # Block not in grabbable margin
-                    print("Found. Aligning...", self.block_position.x)
                     self.base.move(
-                        0, ROTATION_INCREMENT if self.block_position.x < 0 else -ROTATION_INCREMENT, 0.5)
+                        0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
         self.action_state = RobotActionState.WAIT
 
     def move_to_goal(self, goal_pose=(0, 0, 0)):
@@ -192,7 +204,6 @@ class BlockBot(InterbotixLocobotXS):
             x_vel, theta_vel = self.controller.step(self.estimated_pose)
             self.__command(x_vel, theta_vel)
             r.sleep()
-        
         self.action_state = RobotActionState.WAIT
         if i+1 == MAX_MOVES:
             print(f"Moves limit reached:{MAX_MOVES}")
@@ -205,10 +216,12 @@ class BlockBot(InterbotixLocobotXS):
         self.localizer.use_landmarks = use
     
     def execute_sequence(self):
-        self.find_block()
+        if self.find_goal("block"):
+            self.grab_block()
+            if self.find_goal("bin"):
+                self.release_block()
 
 
 if __name__ == "__main__":
-    blockbot = BlockBot()
-    blockbot.update_position_estimate()
-    # blockbot.execute_sequence()
+    blockbot = BlockBot(True)
+    blockbot.execute_sequence()
