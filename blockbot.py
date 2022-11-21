@@ -173,16 +173,30 @@ class BlockBot(InterbotixLocobotXS):
 
         r = rospy.Rate(10)
 
-        controller = LocobotController(self, goal_pose)
+        controller = LocobotController(goal_pose)
         
         for i in range(MAX_MOVES):
-            controller.step()
+            # Ideally handled by controller, but avoiding circ dependecy
+            self.update_position_estimate()
+            if (controller.goal_reached):
+                print("Goal reached")
+                break
+
+            x_vel, theta_vel = controller.step(self.estimated_pose)
+            self.__command(x_vel, theta_vel)
             r.sleep()
         
         self.action_state = RobotActionState.WAIT
         if i+1 == MAX_MOVES:
             print(f"Moves limit reached:{MAX_MOVES}")
 
+    def __command(self, x_vel, theta_vel):
+        print(f'Velocities: {x_vel} {theta_vel}')
+        self.base.command_velocity(x_vel, theta_vel)
+
+    def useLandmarks(self, use):
+        self.localizer.use_landmarks = use
+    
     def execute_sequence(self):
         self.find_block()
 
