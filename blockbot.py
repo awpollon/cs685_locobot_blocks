@@ -49,12 +49,17 @@ def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
 
 def calc_angle_dist(theta_1, theta_2):
     theta_rel = theta_1 - theta_2
+
+    sign = 1 if theta_rel >= 0 else -1
+
     #TODO: Check this
     theta_rel = theta_rel % (2 * np.pi)
+
     if theta_rel > math.pi:
         theta_rel -= 2 * np.pi
+        
     
-    return theta_rel
+    return theta_rel * sign
 
 
 class BlockBot(InterbotixLocobotXS):
