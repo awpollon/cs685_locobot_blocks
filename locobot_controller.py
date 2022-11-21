@@ -16,9 +16,9 @@ def calc_angle_dist(theta_1, theta_2):
 
 class LocobotController():
     '''Controller for locobot'''
-    GOAL_DIST_MARGIN = 0.01
+    GOAL_DIST_MARGIN = 0.005
     GOAL_THETA_MARGIN = math.pi/32
-    HEADING_THRESHOLD = math.pi/8
+    HEADING_THRESHOLD = math.pi/16
 
     def __init__(self, goal_pose=((0, 0, 0))) -> None:
         self.reset_goal(goal_pose)
@@ -50,20 +50,22 @@ class LocobotController():
             print(f'Pose theta diff {pose_theta_diff}')
             if abs(pose_theta_diff) <= self.GOAL_THETA_MARGIN:
                 # Within pose theta margin, goal reached
-                print("Goal reached")
                 self.goal_reached = True
                 return 0, 0
 
             else:
+                print(f"Rotating to goal pose only, theta_diff: {pose_theta_diff}")
                 return self.pose_angle_controller.step(0, pose_theta_diff)
         else:
             # Still not at goal position
             theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
             if theta_rel > self.HEADING_THRESHOLD:
                 # Only rotate towards goal
+                print(f"Rotating to goal heading, theta_diff: {theta_rel}")
                 return self.heading_controller.step(0, theta_rel)
             else:
                 # Move towards goal position, adjusting for small heading errors
+                print(f"Moving to goal, dist: {dist}, theta_diff: {theta_rel}")
                 return self.movement_controller.step(dist, theta_rel)
 
     def euclidean_distanced_to_goal(self, current_pose):

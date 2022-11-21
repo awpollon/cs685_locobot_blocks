@@ -66,6 +66,8 @@ class BlockBot(InterbotixLocobotXS):
         self.tags_data = []
         self.block_position = None
         self.found_block = False
+        self.controller = LocobotController()
+
         self.action_state = RobotActionState.WAIT
         self.initialize_robot()
 
@@ -78,6 +80,7 @@ class BlockBot(InterbotixLocobotXS):
         # fix any erroneous gripper positions
         self.gripper.close()
         self.gripper.open()
+        
 
     def reset_base_pose(self):
         '''Resets pose estimate, odometry, and GTSAM data. 
@@ -86,7 +89,7 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom())
+        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=False)
         self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):
@@ -170,19 +173,18 @@ class BlockBot(InterbotixLocobotXS):
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         self.action_state = RobotActionState.MOVE_TO_GOAL
         MAX_MOVES = 500
+        self.controller.reset_goal(goal_pose)
 
-        r = rospy.Rate(10)
-
-        controller = LocobotController(goal_pose)
-        
+        r = rospy.Rate(10)        
         for i in range(MAX_MOVES):
             # Ideally handled by controller, but avoiding circ dependecy
             self.update_position_estimate()
-            if (controller.goal_reached):
+            if (self.controller.goal_reached):
                 print("Goal reached")
-                break
+                self.__command(0, 0)
+                return
 
-            x_vel, theta_vel = controller.step(self.estimated_pose)
+            x_vel, theta_vel = self.controller.step(self.estimated_pose)
             self.__command(x_vel, theta_vel)
             r.sleep()
         

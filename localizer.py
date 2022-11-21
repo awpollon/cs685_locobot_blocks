@@ -31,10 +31,10 @@ def calc_pos_from_bearing_range(pose, l_bearing, l_range):
 
 
 class BlockBotLocalizer:
-    def __init__(self, start=(0, 0, 0)) -> None:
+    def __init__(self, start=(0, 0, 0), use_landmarks=True) -> None:
         # Track pose id index
         self.current_idx = 0
-        self.use_landmarks = True
+        self.use_landmarks = use_landmarks
         self.debug = True
 
         self.seen_landmarks = set()

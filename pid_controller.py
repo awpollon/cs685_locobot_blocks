@@ -3,20 +3,19 @@ import rospy
 
 
 class LocobotPIDController:
-    MAX_X_VEL = .2
+    MAX_X_VEL = .3
     MAX_THETA_VEL = math.pi/4
 
     def __init__(self) -> None:
-        # self.bot = bot
         self.last_step_time = 0
         self.last_dist = None
         self.last_theta = None
 
-        self.KP_vel = 0.3
-        self.KP_theta = 0.2
+        self.KP_vel = 0.6
+        self.KP_theta = 0.1
 
-        self.KI_vel = 0.1
-        self.KI_theta = 0.1
+        self.KI_vel = 0.05
+        self.KI_theta = 0
 
         self.KD_vel = 0
         self.KD_theta = 0
@@ -33,7 +32,7 @@ class LocobotPIDController:
         theta_p = self.KP_theta * theta_rel
 
         # Dampen x based on magnitude of theta
-        x_p = x_p * ((math.pi - abs(theta_rel)) / math.pi)
+        # x_p = x_p * ((math.pi - abs(theta_rel)) / math.pi)
 
         self.x_it += (dist * self.KI_vel * dt)
         self.theta_it += (theta_rel * self.KI_theta * dt)
@@ -48,8 +47,8 @@ class LocobotPIDController:
         raw_x_vel = x_p + self.x_it + x_d
         raw_theta_vel = theta_p + self.theta_it + theta_d
 
-        x_vel = min(raw_x_vel, self.MAX_X_VEL)
-        theta_vel = min(raw_theta_vel, self.MAX_THETA_VEL)
+        x_vel = max(min(raw_x_vel, self.MAX_X_VEL), -self.MAX_X_VEL)
+        theta_vel = max(min(raw_theta_vel, self.MAX_THETA_VEL), -self.MAX_THETA_VEL)
 
         return x_vel, theta_vel
 
