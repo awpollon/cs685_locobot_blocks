@@ -151,6 +151,7 @@ class BlockBot(InterbotixLocobotXS):
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
         self.arm.go_to_sleep_pose()
+        self.block_tag_data = None
         self.action_state = RobotActionState.WAIT
 
     def release_block(self):
