@@ -32,7 +32,7 @@ class LocobotPIDController:
         theta_p = self.KP_theta * theta_rel
 
         # Dampen x based on magnitude of theta
-        # x_p = x_p * ((math.pi - abs(theta_rel)) / math.pi)
+        x_p = x_p * ((math.pi - abs(theta_rel)) / math.pi)
 
         self.x_it += (dist * self.KI_vel * dt)
         self.theta_it += (theta_rel * self.KI_theta * dt)
