@@ -93,7 +93,7 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True)
+        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=False)
         self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):
@@ -143,6 +143,7 @@ class BlockBot(InterbotixLocobotXS):
             r.sleep()
         # After the duration has passed, stop
         self.base.command_velocity(0, 0)
+        self.update_position_estimate()
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
@@ -254,6 +255,7 @@ class BlockBot(InterbotixLocobotXS):
                 self.action_state == RobotActionState.RETURN_HOME
                 # TODO: Could go back to where block was found to continue search
                 self.move_to_goal()
+                self.camera.tillt(CAMERA_SETTINGS["search_tilt"])
 
     def get_camera_tilt(self):
         return -self.camera.info['tilt']['command']

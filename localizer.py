@@ -43,17 +43,23 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     length_to_camera_center = math.sqrt(tag.x**2 + tag.y**2)
     
     # Now project so parallel to the ground based on camera tilt
-    t_range = math.sqrt(tag.y**2 + tag.z**2) * np.cos(camera_tilt)
+    t_range_camera = math.sqrt(tag.y**2 + tag.z**2) * np.cos(camera_tilt)
+    camera_x_dist = 0.06
+    t_range_bot = math.sqrt(tag.x**2 + (t_range_camera + camera_x_dist)**2)
 
     # For bearing, need signed value of length to center
     # x > 0 is clockwise from camera center
-    if tag.x > 0:
-        length_to_camera_center *= -1
+    # if tag.x > 0:
+    #     length_to_camera_center *= -1
 
     # Find the bearing angle from camera to tag
-    t_bearing = math.atan2(length_to_camera_center, tag.z)
+    # t_bearing = math.atan2(length_to_camera_center, tag.z)
+    t_bearing = math.asin(tag.x / t_range_bot)
+
+    # Flip bearing for correct bot roation
     
-    return t_bearing, t_range
+    
+    return -t_bearing, t_range_bot
 
 
 class BlockBotLocalizer:

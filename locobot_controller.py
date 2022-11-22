@@ -17,7 +17,7 @@ def calc_angle_dist(theta_1, theta_2):
 class LocobotController():
     '''Controller for locobot'''
     GOAL_DIST_MARGIN = 0.01
-    GOAL_THETA_MARGIN = math.pi/32
+    GOAL_THETA_MARGIN = math.pi/96
     HEADING_THRESHOLD = math.pi/8
 
     def __init__(self, goal_pose=((0, 0, 0))) -> None:
