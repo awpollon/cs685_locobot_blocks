@@ -27,7 +27,7 @@ TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 ROTATION_INCREMENT = math.pi/20.0
 MOVE_INCREMENT = 0.05
 
-CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 4*math.pi/16, "pan": 0, "height": 0.45}
+CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
 GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
@@ -93,7 +93,7 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=False)
+        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True)
         self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):

@@ -43,7 +43,7 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     length_to_camera_center = math.sqrt(tag.x**2 + tag.y**2)
     
     # Now project so parallel to the ground based on camera tilt
-    t_range = math.sqrt(length_to_camera_center + tag.z**2) * np.cos(camera_tilt)
+    t_range = math.sqrt(tag.y**2 + tag.z**2) * np.cos(camera_tilt)
 
     # For bearing, need signed value of length to center
     # x > 0 is clockwise from camera center
