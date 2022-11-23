@@ -10,7 +10,7 @@ X = symbol_shorthand.X
 PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.01, 0.01, 0.01], dtype=float))
 ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.1, 0.1, math.pi/8], dtype=float))
+    np.array([0.01, 0.01, math.pi/32], dtype=float))
 LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.5, 0.5], dtype=float))
 
@@ -40,7 +40,7 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     # y = real vertical distance from camera center, down is positive
 
     # Project the tag distance to the camera center parallel to the ground based on camera tilt
-    dist_to_camera_center = math.sqrt(tag.x**2 + tag.y**2 + tag.y**2) * np.cos(camera_tilt)
+    dist_to_camera_center = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
 
     # Adjust for placement of camera from center of LoCoBot
     camera_x_dist = 0.06

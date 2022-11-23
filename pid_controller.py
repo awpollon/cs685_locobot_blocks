@@ -12,17 +12,14 @@ class LocobotPIDController:
         self.last_theta = None
 
         self.KP_vel = 0.7
-        # self.KP_theta = 1
-        self.KP_theta = self.KP_vel
+        self.KP_theta = 1
 
         self.KI_vel = 0
-        # self.KI_theta = .01
-        self.KI_theta = self.KI_vel
+        self.KI_theta = .01
 
         self.KD_vel = 0.05
-        # self.KD_theta = 0.2
-        self.KD_theta = self.KD_vel
-        
+        self.KD_theta = 0.2
+
         self.x_it = 0
         self.theta_it = 0
         

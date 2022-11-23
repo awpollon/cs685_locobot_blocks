@@ -16,7 +16,7 @@ def calc_angle_dist(theta_1, theta_2):
 
 class LocobotController():
     '''Controller for locobot'''
-    GOAL_DIST_MARGIN = 0.01
+    ACCEPTANCE_RADIUS = 0.0
     GOAL_THETA_MARGIN = math.pi/96
     HEADING_THRESHOLD = math.pi/8
 
@@ -49,7 +49,7 @@ class LocobotController():
         dist = self.euclidean_distanced_to_goal(current_pose)
         print(f"Dist: {dist}")
         
-        if abs(dist) <= self.GOAL_DIST_MARGIN or self.goal_point_reached:
+        if abs(dist) <= self.ACCEPTANCE_RADIUS or self.goal_point_reached:
             self.goal_point_reached = True
             # Within x, y margin, now rotate to match goal pose
             pose_theta_diff = calc_angle_dist(g_theta, pos_theta)
