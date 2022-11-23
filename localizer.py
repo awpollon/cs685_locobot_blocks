@@ -40,10 +40,10 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     # y = real vertical distance from camera center, down is positive
 
     # Project the tag distance to the camera center parallel to the ground based on camera tilt
-    dist_to_camera_center = math.sqrt(tag.x**2 + tag.y**2 + tag.z**2) * np.cos(camera_tilt)
+    dist_to_camera_center = math.sqrt(tag.z**2 + tag.x**2 + tag.y**2) * np.cos(camera_tilt)
 
     # Adjust for placement of camera from center of LoCoBot
-    camera_x_dist = 0.06
+    camera_x_dist = 0.07
     t_range = math.sqrt(tag.x**2 + (dist_to_camera_center + camera_x_dist)**2)
 
     # Find the bearing angle from LoCobot center to tag
@@ -138,9 +138,13 @@ class BlockBotLocalizer:
         parameters.setMaxIterations(1000)
         optimizer = gtsam.GaussNewtonOptimizer(
                     self.graph, self.initial_estimate, parameters)
-        result = optimizer.optimize()
-        marginals = gtsam.Marginals(self.graph, result)
+        self.result = optimizer.optimize()
+        marginals = gtsam.Marginals(self.graph, self.result)
 
         # Update estimated pose
-        self.estimated_pose = result.atPose2(X(self.current_idx))
+        self.estimated_pose = self.result.atPose2(X(self.current_idx))
         self.current_covariance = marginals.marginalCovariance(X(self.current_idx))
+
+        print("Estimated landmark positions:")
+        for l_id in self.seen_landmarks:
+            print(f"{l_id}: {self.result.atPoint2(L(l_id))}")

@@ -18,6 +18,9 @@ class RobotActionState(Enum):
     RELEASE_BLOCK = 6
     RETURN_HOME = 7
 
+    
+MAX_X_VEL = .2
+MAX_THETA_VEL = 3*math.pi/4
 
 BLOCK_TAGS = [91, 685]
 LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
@@ -29,25 +32,9 @@ MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
+BLOCK_TRAVEL_RADIUS = 0.4
 GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
-
-
-def calc_velocities(dist, theta_rel, K_vel=0.3, K_theta=0.5):
-    MAX_X_VEL = .2
-    MIN_X_VEL = .03
-
-    MAX_THETA_VEL = math.pi/4
-    MIN_THETA_VEL = math.pi/16
-
-    x_vel = min(K_vel * dist * ((math.pi - abs(theta_rel)) / math.pi), MAX_X_VEL)
-    theta_vel = min(K_theta * theta_rel, MAX_THETA_VEL)
-
-    if theta_rel > math.pi/8:
-        x_vel = 0
-
-    # print(x_vel, theta_vel)
-    return x_vel, theta_vel
 
 
 def calc_angle_dist(theta_1, theta_2):
@@ -93,7 +80,7 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=False)
+        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True)
         self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):
@@ -189,9 +176,8 @@ class BlockBot(InterbotixLocobotXS):
                     
                     print(f"Block estimated at {est_block_x}, {est_block_y}")
 
-                    stop_dist = .17
-                    dx = stop_dist * np.cos(block_bearing)
-                    dy = stop_dist * np.sin(block_bearing)
+                    dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
+                    dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
 
                     target_pose = (est_block_x - dx, est_block_y - dy, block_bearing)
                     if not self.move_to_goal(target_pose):
@@ -240,7 +226,10 @@ class BlockBot(InterbotixLocobotXS):
 
         return False
 
-    def __command(self, x_vel, theta_vel):
+    def __command(self, raw_x_vel, raw_theta_vel):
+        x_vel = max(min(raw_x_vel, MAX_X_VEL), -MAX_X_VEL)
+        theta_vel = max(min(raw_theta_vel, MAX_THETA_VEL), -MAX_THETA_VEL)
+
         print(f'Velocities: {x_vel} {theta_vel}')
         self.base.command_velocity(x_vel, theta_vel)
 
