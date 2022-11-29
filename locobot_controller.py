@@ -42,9 +42,7 @@ class LocobotController():
         if self.goal_reached:
             return 0, 0
 
-        pos_x = current_pose.x()
-        pos_y = current_pose.y()
-        pos_theta = current_pose.theta()
+        pos_x, pos_y, pos_theta = current_pose
 
         print(f"Current pose: {current_pose}")
         print(f"Goal pose: {self.goal_pose}")
@@ -92,9 +90,10 @@ class LocobotController():
 
     def euclidean_distanced_to_goal(self, current_pose):
         (g_x, g_y, _) = self.goal_pose
-        dist = np.sqrt((g_y - current_pose.y()) ** 2 + (g_x - current_pose.x()) ** 2)
+        x, y, _ = current_pose
+        dist = np.sqrt((g_y - y) ** 2 + (g_x - x) ** 2)
 
-        if g_x < current_pose.x():
+        if g_x < x:
             dist *= -1
 
         return dist

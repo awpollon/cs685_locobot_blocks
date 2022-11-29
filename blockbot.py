@@ -78,12 +78,10 @@ class BlockBot(InterbotixLocobotXS):
     def reset_base_pose(self):
         '''Resets pose estimate, odometry, and GTSAM data. 
         Call this instead of reset_odom()'''
-        self.estimated_pose = (0, 0, 0)
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
         self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True)
-        self.estimated_pose = self.localizer.estimated_pose
 
     def update_position_estimate(self):
         '''Update localizer with current odometry and observed landmarks'''
@@ -95,7 +93,6 @@ class BlockBot(InterbotixLocobotXS):
         camera_tilt = self.get_camera_tilt()
         self.localizer.add_observation(odom, landmarks, camera_tilt)
         self.localizer.optmize()
-        self.estimated_pose = self.localizer.estimated_pose
 
         print("Odometry measurement")
         print(odom)
@@ -228,7 +225,7 @@ class BlockBot(InterbotixLocobotXS):
                 self.__command(0, 0)
                 return True
 
-            x_vel, theta_vel = self.controller.step(self.estimated_pose)
+            x_vel, theta_vel = self.controller.step(self.get_estimated_pose())
             self.__command(x_vel, theta_vel)
             r.sleep()
 
@@ -273,7 +270,8 @@ class BlockBot(InterbotixLocobotXS):
         return -self.camera.info['tilt']['command']
 
     def get_estimated_pose(self):
-        return (self.estimated_pose.x(), self.estimated_pose.y(), self.estimated_pose.theta())
+        estimated_pose = self.localizer.estimated_pose
+        return (estimated_pose.x(), estimated_pose.y(), estimated_pose.theta())
 
 
 if __name__ == "__main__":
