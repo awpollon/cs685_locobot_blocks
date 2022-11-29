@@ -32,9 +32,11 @@ MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.4
+BLOCK_TRAVEL_RADIUS = 0.40
 GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
+
+CONTROL_LOOP_LIMIT = 500
 
 
 def calc_angle_dist(theta_1, theta_2):
@@ -154,62 +156,71 @@ class BlockBot(InterbotixLocobotXS):
     def find_goal(self, type="block"):
         self.action_state = RobotActionState.SEARCH_FOR_BLOCK
         self.camera.move("tilt", CAMERA_SETTINGS["search_tilt"])
-        for _ in range(500):
+
+        for _ in range(CONTROL_LOOP_LIMIT):
             if type == "block":
                 pos = self.block_tag_data
             elif type == "bin":
                 pos = self.bin_tag_data
 
-            if not pos:  # No block in view, keep searching
+            if pos:
+                # Calculate block bearing and range, return
+                camera_tilt = self.get_camera_tilt()
+                return calc_bearing_range_from_tag(pos, camera_tilt)
+
+            else:
+                # No block in view, keep searching
                 self.move(0, 2 * ROTATION_INCREMENT, 0.5)
-            else:  # Block in view
-                if self.action_state == RobotActionState.SEARCH_FOR_BLOCK:
-                    # ONLY RUNS ONCE IN LOOP
-
-                    # Estimate block location and travel to it
-                    self.action_state = RobotActionState.TRAVEL_TO_BLOCK
-
-                    camera_tilt = self.get_camera_tilt()
-                    block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
-
-                    est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
-                    
-                    print(f"Block estimated at {est_block_x}, {est_block_y}")
-
-                    dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
-                    dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
-
-                    target_pose = (est_block_x - dx, est_block_y - dy, block_bearing)
-                    if not self.move_to_goal(target_pose):
-                        print("Unable to reach block")
-                        self.action_state = RobotActionState.WAIT
-                        return
-
-                    # Near block, now align
-                    self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
-                    self.action_state = RobotActionState.ALIGN_WITH_BLOCK
-
-                if self.action_state == RobotActionState.ALIGN_WITH_BLOCK:
-                    if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]: # Block in grabbable margin
-                        if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away                        
-                            self.move(MOVE_INCREMENT, 0, 0.5)
-                        else:  # Block is grabbable
-                            return True
-                    else:  # Block not in grabbable margin
-                        self.move(
-                            0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
-        
+     
         print("Block search limit reached")
-        self.action_state = RobotActionState.WAIT
+        return None
 
+    def travel_to_block(self, block_bearing_range):
+        self.action_state = RobotActionState.TRAVEL_TO_BLOCK
+        block_bearing, block_range = block_bearing_range
+        est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
+
+        print(f"Block estimated at {est_block_x}, {est_block_y}")
+        
+        # Move to point near block, don't rotate to any particular goal angle
+        dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
+        dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
+
+        target_pose = (est_block_x - dx, est_block_y - dy, None)
+        if not self.move_to_goal(target_pose):
+            print("Unable to reach block")
+            self.action_state = RobotActionState.WAIT
+            return False
+        else:
+            return True
+
+    def align_with_block(self):
+        # Near block, now align
+        self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
+        self.action_state = RobotActionState.ALIGN_WITH_BLOCK
+
+        for _ in range(CONTROL_LOOP_LIMIT):
+            pos = self.block_tag_data
+
+            if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]: # Block in grabbable margin
+                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away                        
+                    self.move(MOVE_INCREMENT, 0, 0.5)
+                else:  # Block is grabbable
+                    return True
+            else:  # Block not in grabbable margin
+                self.move(
+                    0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
+
+        print("Loop limit reached in align_with_block")
+        return False
+        
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         print(f"Starting move to goal: {goal_pose}")
         self.action_state = RobotActionState.MOVE_TO_GOAL
-        MAX_MOVES = 500
         self.controller.reset_goal(goal_pose)
 
         r = rospy.Rate(10)        
-        for i in range(MAX_MOVES):
+        for _ in range(CONTROL_LOOP_LIMIT):
             # Ideally handled by controller, but avoiding circ dependecy
             self.update_position_estimate()
             if (self.controller.goal_reached):
@@ -220,10 +231,9 @@ class BlockBot(InterbotixLocobotXS):
             x_vel, theta_vel = self.controller.step(self.estimated_pose)
             self.__command(x_vel, theta_vel)
             r.sleep()
-        self.action_state = RobotActionState.WAIT
-        if i+1 == MAX_MOVES:
-            print(f"Moves limit reached:{MAX_MOVES}")
 
+        self.action_state = RobotActionState.WAIT
+        print(f"Moves limit reached trying to move to goal: {goal_pose}")
         return False
 
     def __command(self, raw_x_vel, raw_theta_vel):
@@ -235,16 +245,29 @@ class BlockBot(InterbotixLocobotXS):
 
     def useLandmarks(self, use):
         self.localizer.use_landmarks = use
-    
+
     def execute_sequence(self):
-        if self.find_goal("block"):
-            self.grab_block()
-            if self.move_to_goal((0, 0, -math.pi)):
-                self.release_block()
-                self.action_state == RobotActionState.RETURN_HOME
-                # TODO: Could go back to where block was found to continue search
-                self.move_to_goal()
-                self.camera.tillt(CAMERA_SETTINGS["search_tilt"])
+        block_bearing_range = self.find_goal("block")
+        if block_bearing_range is None:
+            return
+
+        if not self.travel_to_block(block_bearing_range):
+            return
+
+        if not self.align_with_block():
+            return
+
+        if not self.grab_block():
+            return
+
+        if not self.move_to_goal((0, 0, -math.pi)):
+            return
+
+        self.release_block()
+        # TODO: Could go back to where block was found to continue search
+        if not self.move_to_goal():
+            return
+        self.camera.tilt(CAMERA_SETTINGS["search_tilt"])
 
     def get_camera_tilt(self):
         return -self.camera.info['tilt']['command']

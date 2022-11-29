@@ -28,7 +28,7 @@ class LocobotController():
         self.reset_goal(goal_pose)
 
     def reset_goal(self, goal_pose):
-        self.goal_point_reached = False
+        '''If angle is None, just reach coordinate and then goal is reached'''
         self.goal_pose = goal_pose
         self.goal_reached = False
 
@@ -60,7 +60,11 @@ class LocobotController():
         theta_vel = 0
         
         if abs(dist) <= self.TRAVEL_ACCEPTANCE_RADIUS:
-            # self.goal_point_reached = True
+            if g_theta is None:
+                # No angle pose set, goal is reached
+                self.goal_reached = True
+                return 0, 0
+
             # Within x, y margin, now rotate to match goal pose
             pose_theta_diff = calc_angle_dist(g_theta, pos_theta)
             print(f'Pose theta diff {pose_theta_diff}')
