@@ -191,27 +191,10 @@ class BlockBot(InterbotixLocobotXS):
         else:
             return True
 
-    def align_with_block_old(self):
-        # Near block, now align
-        self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
-        self.action_state = RobotActionState.ALIGN_WITH_BLOCK
-
-        for _ in range(CONTROL_LOOP_LIMIT):
-            pos = self.block_tag_data
-
-            if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]: # Block in grabbable margin
-                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away
-                    self.move(MOVE_INCREMENT, 0, 0.5)
-                else:  # Block is grabbable
-                    return True
-            else:  # Block not in grabbable margin
-                self.move(
-                    0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
-
-        print("Loop limit reached in align_with_block")
-        return False
-
     def align_with_block(self):
+        if self.v:
+            print("Starting block alignment.")
+
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
@@ -236,8 +219,6 @@ class BlockBot(InterbotixLocobotXS):
                     theta = 0
                 else:
                     theta = theta_align_controller.step(block_bearing)
-                    # if 0 < abs(theta) < math.pi/18.0:
-                    #     theta = math.pi/18.0 * (abs(theta) / theta)
 
                 if abs(block_range) < 0.02:
                     x = 0
