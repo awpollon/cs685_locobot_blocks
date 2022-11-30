@@ -19,10 +19,10 @@ def calc_angle_dist(theta_1, theta_2):
 
 class LocobotController():
     '''Controller for locobot'''
-    TRAVEL_ACCEPTANCE_RADIUS = 0.02
-    STOP_ACCEPTANCE_RADIUS = 0.02
-    GOAL_THETA_MARGIN = math.pi/32
-    HEADING_THRESHOLD = math.pi/8
+    TRAVEL_ACCEPTANCE_RADIUS = 0.01
+    # STOP_ACCEPTANCE_RADIUS = 0.02
+    GOAL_THETA_MARGIN = math.pi/48
+    # HEADING_THRESHOLD = math.pi/8
 
     MIN_THETA_VEL = math.pi/18
 
@@ -38,7 +38,7 @@ class LocobotController():
         self.goal_point_reached = False
 
         self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.02, KD=0.1, verbose=self.v)
-        self.theta_vel_controller = LocobotPIDController(KP=0.7, KI=.01, KD=.2, verbose=self.v)
+        self.theta_vel_controller = LocobotPIDController(KP=0.7, KI=.05, KD=.2, verbose=self.v)
 
         # self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.05, verbose=self.v)
         self.theta_vel_pose_controller = LocobotPIDController(KP=0.7, KI=.05, KD=.1, verbose=self.v)
