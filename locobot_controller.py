@@ -24,6 +24,8 @@ class LocobotController():
     GOAL_THETA_MARGIN = math.pi/64
     HEADING_THRESHOLD = math.pi/8
 
+    MIN_THETA_VEL = math.pi/18
+
     def __init__(self, goal_pose=((0, 0, 0)), verbose=True) -> None:
         self.v = verbose
         self.reset_goal(goal_pose)
@@ -37,7 +39,7 @@ class LocobotController():
         self.theta_vel_controller = LocobotPIDController(KP=0.7, KD=0, verbose=self.v)
 
         self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
-        self.theta_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
+        self.theta_vel_pose_controller = LocobotPIDController(KP=0.7, KD=0.1, verbose=self.v)
 
     def step(self, current_pose):
         if self.goal_reached:
@@ -81,6 +83,8 @@ class LocobotController():
                 # x_vel = self.x_vel_pose_controller.step(dist)
                 x_vel = 0
                 theta_vel = self.theta_vel_pose_controller.step(pose_theta_diff)
+                if 0 < abs(theta_vel) < self.MIN_THETA_VEL:
+                    theta_vel = self.MIN_THETA_VEL * abs(theta_vel) / theta_vel
         else:
             # Still not at goal position
             theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
