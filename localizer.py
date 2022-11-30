@@ -12,7 +12,7 @@ PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
 ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.01, 0.01, math.pi/32], dtype=float))
 LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.5, 0.5], dtype=float))
+    np.array([0.55, 0.55], dtype=float))
 
 
 def calc_pos_from_bearing_range(pose, l_bearing, l_range):
