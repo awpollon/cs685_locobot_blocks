@@ -22,7 +22,7 @@ class LocobotPIDController:
         p = self.KP * error
 
         if self.v:
-            print(f"dt={dt}")
+            print(f"error={error}, dt={dt}")
         self.it += (error * self.KI * dt)
 
         d = self.KD * ((error - self.last_error) / dt) if self.last_error else 0
