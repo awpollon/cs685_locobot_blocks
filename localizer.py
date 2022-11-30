@@ -50,12 +50,14 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     t_bearing = math.asin(tag.x / t_range)
 
     # Flip bearing for correct bot rotation direction
-    
+
     return -t_bearing, t_range
 
 
 class BlockBotLocalizer:
-    def __init__(self, start=(0, 0, 0), use_landmarks=True) -> None:
+    def __init__(self, start=(0, 0, 0), use_landmarks=True, verbose=True) -> None:
+        self.v = verbose
+
         # Track pose id index
         self.current_idx = 0
         self.use_landmarks = use_landmarks
@@ -98,7 +100,8 @@ class BlockBotLocalizer:
 
         # Add to factor graph and set initial estimate for current Pose
         odom_rel_pose = gtsam.Pose2(rel_x, rel_y, dtheta)
-        print(f'Rel pose: {odom_rel_pose}')
+        if self.v:
+            print(f'Rel pose: {odom_rel_pose}')
         self.graph.add(gtsam.BetweenFactorPose2(X(time_idx - 1), X(time_idx),
                        odom_rel_pose, ODOMETRY_NOISE))
 
@@ -114,13 +117,14 @@ class BlockBotLocalizer:
                 tag = l.pose.pose.pose.position
 
                 l_bearing, l_range = calc_bearing_range_from_tag(tag, camera_tilt)
-                    
+
                 # Add BearingFactor for landmark observation from current pose
                 self.graph.add(gtsam.BearingRangeFactor2D(X(time_idx), L(l_id),
                                gtsam.Rot2(l_bearing), l_range, LANDMARK_NOISE))
 
-                print(f'Landmark {l_id} range: {l_range} bearing: {l_bearing}')
-                print(f'Raw z: {tag.z},x: {tag.x} y: {tag.y}')
+                if self.v:
+                    print(f'Landmark {l_id} range: {l_range} bearing: {l_bearing}')
+                    print(f'Raw z: {tag.z},x: {tag.x} y: {tag.y}')
 
                 # Add estimate for landmark if not seen before
                 if l_id not in self.seen_landmarks:
@@ -128,7 +132,8 @@ class BlockBotLocalizer:
                     # and landmark bearing and range
                     l_pose = calc_pos_from_bearing_range(odom, l_bearing, l_range)
                     self.initial_estimate.insert(L(l_id), gtsam.Point2(*l_pose))
-                    print(f'Initial estimate for {l_id}: {l_pose}')
+                    if self.v:
+                        print(f'Initial estimate for {l_id}: {l_pose}')
                     self.seen_landmarks.add(l_id)
 
     def optmize(self):
@@ -145,6 +150,7 @@ class BlockBotLocalizer:
         self.estimated_pose = self.result.atPose2(X(self.current_idx))
         self.current_covariance = marginals.marginalCovariance(X(self.current_idx))
 
-        print("Estimated landmark positions:")
-        for l_id in self.seen_landmarks:
-            print(f"{l_id}: {self.result.atPoint2(L(l_id))}")
+        if self.v:
+            print("Estimated landmark positions:")
+            for l_id in self.seen_landmarks:
+                print(f"{l_id}: {self.result.atPoint2(L(l_id))}")

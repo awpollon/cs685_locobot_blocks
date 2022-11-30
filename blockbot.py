@@ -6,7 +6,7 @@ from apriltag_ros.msg import AprilTagDetectionArray
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 from localizer import BlockBotLocalizer, calc_pos_from_bearing_range, calc_bearing_range_from_tag
 from locobot_controller import LocobotController
-
+from pid_controller import LocobotPIDController
 
 class RobotActionState(Enum):
     WAIT = 0
@@ -18,7 +18,6 @@ class RobotActionState(Enum):
     RELEASE_BLOCK = 6
     RETURN_HOME = 7
 
-    
 MAX_X_VEL = .2
 MAX_THETA_VEL = 3*math.pi/4
 
@@ -27,7 +26,7 @@ LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
-ROTATION_INCREMENT = math.pi/20.0
+ROTATION_INCREMENT = math.pi/16.0
 MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
@@ -45,24 +44,27 @@ def calc_angle_dist(theta_1, theta_2):
 
     if theta_rel > math.pi:
         theta_rel -= 2 * np.pi
-        
+
     return theta_rel
 
 
 class BlockBot(InterbotixLocobotXS):
-    def __init__(self, align_camera=True) -> None:
+    def __init__(self, align_camera=True, verbose=True) -> None:
         super().__init__("locobot_px100", "mobile_px100")
         rospy.Subscriber("/tag_detections",
                          AprilTagDetectionArray, self.get_tag_data)
 
+        self.v = verbose
         self.tags_data = []
         self.block_tag_data = None
         self.bin_tag_data = None
         self.found_block = False
-        self.controller = LocobotController()
+        self.controller =  LocobotController(verbose=self.v)
 
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
+
+        self.theta_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
 
     def initialize_robot(self, align_camera):
         if align_camera:
@@ -76,12 +78,12 @@ class BlockBot(InterbotixLocobotXS):
         self.gripper.open()
 
     def reset_base_pose(self):
-        '''Resets pose estimate, odometry, and GTSAM data. 
+        '''Resets pose estimate, odometry, and GTSAM data.
         Call this instead of reset_odom()'''
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True)
+        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True, verbose=self.v)
 
     def update_position_estimate(self):
         '''Update localizer with current odometry and observed landmarks'''
@@ -94,13 +96,14 @@ class BlockBot(InterbotixLocobotXS):
         self.localizer.add_observation(odom, landmarks, camera_tilt)
         self.localizer.optmize()
 
-        print("Odometry measurement")
-        print(odom)
+        if self.v:
+            print("Odometry measurement")
+            print(odom)
 
-        print("Covariance:")
-        print(self.localizer.current_covariance)
-        print("Estimated pose: ")
-        print(self.localizer.estimated_pose)
+            print("Covariance:")
+            print(self.localizer.current_covariance)
+            print("Estimated pose: ")
+            print(self.localizer.estimated_pose)
 
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
@@ -108,8 +111,6 @@ class BlockBot(InterbotixLocobotXS):
         block_tag = [tag for tag in data.detections if tag.id[0] in BLOCK_TAGS]
         if len(block_tag) > 0:
             self.block_tag_data = block_tag[0].pose.pose.pose.position
-        # else:
-        #     self.block_position = None
 
         bin_tag = [tag for tag in data.detections if tag.id[0] == BIN_TAG]
         if len(bin_tag) > 0:
@@ -119,7 +120,8 @@ class BlockBot(InterbotixLocobotXS):
 
     def move(self, x=0, yaw=0, duration=1.0):
         '''Adapted from Interbotix API, but adding localization'''
-        print(f'Moving x={x} yaw={yaw}, dur={duration}')
+        if self.v:
+            print(f'Moving x={x} yaw={yaw}, dur={duration}')
         time_start = rospy.get_time()
         r = rospy.Rate(10)
         # Publish Twist at 10 Hz for duration
@@ -140,6 +142,7 @@ class BlockBot(InterbotixLocobotXS):
         self.arm.go_to_sleep_pose()
         self.block_tag_data = None
         self.action_state = RobotActionState.WAIT
+        return True
 
     def release_block(self):
         self.action_state = RobotActionState.RELEASE_BLOCK
@@ -168,7 +171,7 @@ class BlockBot(InterbotixLocobotXS):
             else:
                 # No block in view, keep searching
                 self.move(0, 2 * ROTATION_INCREMENT, 0.5)
-     
+
         print("Block search limit reached")
         return None
 
@@ -178,7 +181,7 @@ class BlockBot(InterbotixLocobotXS):
         est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
 
         print(f"Block estimated at {est_block_x}, {est_block_y}")
-        
+
         # Move to point near block, don't rotate to any particular goal angle
         dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
         dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
@@ -191,7 +194,7 @@ class BlockBot(InterbotixLocobotXS):
         else:
             return True
 
-    def align_with_block(self):
+    def align_with_block_old(self):
         # Near block, now align
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
@@ -200,7 +203,7 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
 
             if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]: # Block in grabbable margin
-                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away                        
+                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:  # Block is far away
                     self.move(MOVE_INCREMENT, 0, 0.5)
                 else:  # Block is grabbable
                     return True
@@ -210,13 +213,40 @@ class BlockBot(InterbotixLocobotXS):
 
         print("Loop limit reached in align_with_block")
         return False
-        
+
+    def align_with_block(self):
+        self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
+        self.action_state = RobotActionState.ALIGN_WITH_BLOCK
+
+        # self.theta_align_controller
+        pos = self.block_tag_data
+        camera_tilt = self.get_camera_tilt()
+        block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
+        print("Here", self.theta_align_controller.step(pos.x))
+        return True
+
+
+        for _ in range(CONTROL_LOOP_LIMIT):
+            pos = self.block_tag_data
+
+            if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]:
+                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:
+                    self.move(MOVE_INCREMENT, 0, 0.5)
+                else:
+                    return True
+            else:
+                self.move(0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
+
+        print("Loop limit reached in align_with_block")
+        return False
+
+
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         print(f"Starting move to goal: {goal_pose}")
         self.action_state = RobotActionState.MOVE_TO_GOAL
         self.controller.reset_goal(goal_pose)
 
-        r = rospy.Rate(10)        
+        r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
             # Ideally handled by controller, but avoiding circ dependecy
             self.update_position_estimate()
@@ -237,7 +267,8 @@ class BlockBot(InterbotixLocobotXS):
         x_vel = max(min(raw_x_vel, MAX_X_VEL), -MAX_X_VEL)
         theta_vel = max(min(raw_theta_vel, MAX_THETA_VEL), -MAX_THETA_VEL)
 
-        print(f'Velocities: {x_vel} {theta_vel}')
+        if self.v:
+            print(f'Velocities: {x_vel} {theta_vel}')
         self.base.command_velocity(x_vel, theta_vel)
 
     def useLandmarks(self, use):
@@ -254,13 +285,14 @@ class BlockBot(InterbotixLocobotXS):
         if not self.align_with_block():
             return
 
+        return
+
         if not self.grab_block():
             return
 
         if not self.move_to_goal((0, 0, -math.pi)):
             return
 
-        self.release_block()
         # TODO: Could go back to where block was found to continue search
         if not self.move_to_goal():
             return
@@ -275,5 +307,5 @@ class BlockBot(InterbotixLocobotXS):
 
 
 if __name__ == "__main__":
-    blockbot = BlockBot(True)
+    blockbot = BlockBot(True, False)
     blockbot.execute_sequence()

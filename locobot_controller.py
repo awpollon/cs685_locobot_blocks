@@ -13,7 +13,7 @@ def calc_angle_dist(theta_1, theta_2):
 
     if theta_rel < -math.pi:
         theta_rel += 2 * np.pi
-    
+
     return theta_rel
 
 
@@ -24,7 +24,8 @@ class LocobotController():
     GOAL_THETA_MARGIN = math.pi/64
     HEADING_THRESHOLD = math.pi/8
 
-    def __init__(self, goal_pose=((0, 0, 0))) -> None:
+    def __init__(self, goal_pose=((0, 0, 0)), verbose=True) -> None:
+        self.v = verbose
         self.reset_goal(goal_pose)
 
     def reset_goal(self, goal_pose):
@@ -32,11 +33,11 @@ class LocobotController():
         self.goal_pose = goal_pose
         self.goal_reached = False
 
-        self.x_vel_controller = LocobotPIDController(KP=0.5, KD=0)
-        self.theta_vel_controller = LocobotPIDController(KP=0.7, KD=0)
+        self.x_vel_controller = LocobotPIDController(KP=0.5, KD=0, verbose=self.v)
+        self.theta_vel_controller = LocobotPIDController(KP=0.7, KD=0, verbose=self.v)
 
-        self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1)
-        self.theta_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1)
+        self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
+        self.theta_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
 
     def step(self, current_pose):
         if self.goal_reached:
@@ -44,19 +45,21 @@ class LocobotController():
 
         pos_x, pos_y, pos_theta = current_pose
 
-        print(f"Current pose: {current_pose}")
-        print(f"Goal pose: {self.goal_pose}")
+        if self.v:
+            print(f"Current pose: {current_pose}")
+            print(f"Goal pose: {self.goal_pose}")
 
         (g_x, g_y, g_theta) = self.goal_pose
-        
+
         # Check current distance
         dist = self.euclidean_distanced_to_goal(current_pose)
-        print(f"Dist: {dist}")
+        if self.v:
+            print(f"Dist: {dist}")
 
         # Default to stop
         x_vel = 0
         theta_vel = 0
-        
+
         if abs(dist) <= self.TRAVEL_ACCEPTANCE_RADIUS:
             if g_theta is None:
                 # No angle pose set, goal is reached
@@ -65,15 +68,16 @@ class LocobotController():
 
             # Within x, y margin, now rotate to match goal pose
             pose_theta_diff = calc_angle_dist(g_theta, pos_theta)
-            print(f'Pose theta diff {pose_theta_diff}')
+            if self.v:
+                print(f'Pose theta diff {pose_theta_diff}')
             if abs(pose_theta_diff) <= self.GOAL_THETA_MARGIN and abs(dist) <= self.STOP_ACCEPTANCE_RADIUS:
                 # Within pose theta margin, goal reached
                 self.goal_reached = True
                 x_vel = 0
                 theta_vel = 0
-
             else:
-                print(f"Rotating to goal pose only, theta_diff: {pose_theta_diff}")
+                if self.v:
+                    print(f"Rotating to goal pose only, theta_diff: {pose_theta_diff}")
                 x_vel = self.x_vel_pose_controller.step(dist)
                 theta_vel = self.theta_vel_pose_controller.step(pose_theta_diff)
         else:
@@ -81,11 +85,12 @@ class LocobotController():
             theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
 
             # Move towards goal position, adjusting for small heading errors
-            print(f"Moving to goal, dist: {dist}, theta_diff: {theta_rel}")
+            if self.v:
+                print(f"Moving to goal, dist: {dist}, theta_diff: {theta_rel}")
             # Only move forward when traveling
             x_vel = self.x_vel_controller.step(abs(dist))
             theta_vel = self.theta_vel_controller.step(theta_rel)
-            
+
         return x_vel, theta_vel
 
     def euclidean_distanced_to_goal(self, current_pose):
@@ -97,4 +102,4 @@ class LocobotController():
             dist *= -1
 
         return dist
-    
+
