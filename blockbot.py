@@ -230,8 +230,10 @@ class BlockBot(InterbotixLocobotXS):
             block_bearing += 0.099
             block_range -= 0.35
 
-            if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
+            print("Here", block_bearing, block_range)
+            if abs(block_bearing) < 0.05 and abs(block_range) < 0.005:
                 print("Aligned")
+                self.__command(0, 0)
                 return True
             else:
                 if abs(block_bearing) < 0.05:
@@ -241,7 +243,7 @@ class BlockBot(InterbotixLocobotXS):
                     if 0 < theta < math.pi/18.0:
                         theta = math.pi/18.0
 
-                if abs(block_range) < 0.02:
+                if abs(block_range) < 0.005:
                     x = 0
                 else:
                     x = x_align_controller.step(block_range)
