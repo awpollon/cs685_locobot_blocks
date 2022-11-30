@@ -215,8 +215,8 @@ class BlockBot(InterbotixLocobotXS):
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
-        theta_align_controller = LocobotPIDController(KP=0.7, KD=0.1, verbose=False)
-        x_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=False)
+        x_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
+        theta_align_controller = LocobotPIDController(KP=0.7, KI=.1, KD=.1, verbose=self.v)
 
         camera_tilt = self.get_camera_tilt()
 
@@ -236,8 +236,8 @@ class BlockBot(InterbotixLocobotXS):
                     theta = 0
                 else:
                     theta = theta_align_controller.step(block_bearing)
-                    if 0 < abs(theta) < math.pi/18.0:
-                        theta = math.pi/18.0 * (abs(theta) / theta)
+                    # if 0 < abs(theta) < math.pi/18.0:
+                    #     theta = math.pi/18.0 * (abs(theta) / theta)
 
                 if abs(block_range) < 0.02:
                     x = 0
