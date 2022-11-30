@@ -300,6 +300,8 @@ class BlockBot(InterbotixLocobotXS):
         if not self.move_to_goal((0, 0, -math.pi)):
             return
 
+        self.release_block()
+
         # TODO: Could go back to where block was found to continue search
         if not self.move_to_goal():
             return
