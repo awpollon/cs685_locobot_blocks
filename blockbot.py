@@ -228,7 +228,7 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
             block_bearing += 0.099
-            block_range -= 0.31
+            block_range -= 0.325
 
             print("Here", block_bearing, block_range)
             if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
