@@ -40,7 +40,7 @@ def calc_bearing_range_from_tag(tag, camera_tilt):
     # y = real vertical distance from camera center, down is positive
 
     # Project the tag distance to the camera center parallel to the ground based on camera tilt
-    dist_to_camera_center = math.sqrt(tag.z**2 + tag.x**2 + tag.y**2) * np.cos(camera_tilt)
+    dist_to_camera_center = math.sqrt(tag.z**2 - tag.x**2 - tag.y**2) * np.cos(camera_tilt)
 
     # Adjust for placement of camera from center of LoCoBot
     camera_x_dist = 0.07

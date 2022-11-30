@@ -64,7 +64,7 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
 
-        self.theta_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
+#        self.theta_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
 
     def initialize_robot(self, align_camera):
         if align_camera:
@@ -218,28 +218,27 @@ class BlockBot(InterbotixLocobotXS):
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
-        # self.theta_align_controller
-        pos = self.block_tag_data
+        self.theta_align_controller = LocobotPIDController(KP=0.7, KD=0.1, verbose=False)
+
         camera_tilt = self.get_camera_tilt()
-        block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
-        print("Here", self.theta_align_controller.step(pos.x))
-        return True
 
-
+        r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
             pos = self.block_tag_data
-
-            if GRABBABLE_MARGIN[0] < pos.x < GRABBABLE_MARGIN[1]:
-                if abs(pos.z - GRABBABLE_APRILTAG_Z) > 0.01:
-                    self.move(MOVE_INCREMENT, 0, 0.5)
-                else:
-                    return True
+            block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
+            if -0.1 < block_bearing < 0.1:
+                print("Aligned")
+                return True
             else:
-                self.move(0, ROTATION_INCREMENT if pos.x < 0 else -ROTATION_INCREMENT, 0.5)
+#                print("Here", block_bearing, self.theta_align_controller.step(block_bearing))
+                theta = self.theta_align_controller.step(block_bearing)
+                if 0 < theta < math.pi/12.0:
+                    theta = math.pi/12.0
+                self.__command(0, theta)
+        r.sleep()
 
         print("Loop limit reached in align_with_block")
         return False
-
 
     def move_to_goal(self, goal_pose=(0, 0, 0)):
         print(f"Starting move to goal: {goal_pose}")
