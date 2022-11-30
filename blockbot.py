@@ -218,7 +218,8 @@ class BlockBot(InterbotixLocobotXS):
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
-        self.theta_align_controller = LocobotPIDController(KP=0.7, KD=0.1, verbose=False)
+        theta_align_controller = LocobotPIDController(KP=0.7, KD=0.1, verbose=False)
+        x_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=False)
 
         camera_tilt = self.get_camera_tilt()
 
@@ -226,15 +227,19 @@ class BlockBot(InterbotixLocobotXS):
         for _ in range(CONTROL_LOOP_LIMIT):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
-            if -0.1 < block_bearing < 0.1:
+            block_bearing += 0.099
+            block_range = block_range -= 0.35
+
+            if -0.05 < block_bearing < 0.05 and -0.02 < block_range < 0.02:
                 print("Aligned")
                 return True
             else:
-#                print("Here", block_bearing, self.theta_align_controller.step(block_bearing))
-                theta = self.theta_align_controller.step(block_bearing)
-                if 0 < theta < math.pi/16.0:
-                    theta = math.pi/16.0
-                self.__command(0, theta)
+                theta = theta_align_controller.step(block_bearing)
+                if 0 < theta < math.pi/18.0:
+                    theta = math.pi/18.0
+
+                x = x_align_controller.step(block_range)
+                self.__command(x, theta)
             r.sleep()
 
         print("Loop limit reached in align_with_block")
