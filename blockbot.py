@@ -32,9 +32,9 @@ MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.40
-GRABBABLE_APRILTAG_Z = 0.5
-GRABBABLE_MARGIN = [-0.01, 0.01]
+BLOCK_TRAVEL_RADIUS = 0.35
+GRABBING_RADIUS = 0.325
+GRABBING_BEARING = 0.099
 
 ALIGN_BEARING_ACCEPTANCE = 0.05
 ALIGN_RADIUS_ACCEPTANCE = 0.02
@@ -217,8 +217,8 @@ class BlockBot(InterbotixLocobotXS):
         for _ in range(CONTROL_LOOP_LIMIT):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
-            block_bearing += 0.099
-            block_range -= 0.32
+            block_bearing += GRABBING_BEARING
+            block_range -= GRABBING_RADIUS
 
             if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE and abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
                 print("Aligned")
