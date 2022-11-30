@@ -20,7 +20,7 @@ class RobotActionState(Enum):
 
 
 MAX_X_VEL = .2
-MAX_THETA_VEL = 3*math.pi/4
+MAX_THETA_VEL = math.pi
 
 BLOCK_TAGS = [91, 685]
 LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
@@ -218,7 +218,7 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
             block_bearing += 0.099
-            block_range -= 0.325
+            block_range -= 0.32
 
             if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE and abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
                 print("Aligned")
