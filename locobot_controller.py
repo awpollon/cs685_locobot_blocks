@@ -35,6 +35,8 @@ class LocobotController():
         self.goal_pose = goal_pose
         self.goal_reached = False
 
+        self.goal_point_reached = False
+
         self.x_vel_controller = LocobotPIDController(KP=0.5, KD=0, verbose=self.v)
         self.theta_vel_controller = LocobotPIDController(KP=0.7, KI=.1, KD=.1, verbose=self.v)
 
@@ -62,7 +64,9 @@ class LocobotController():
         x_vel = 0
         theta_vel = 0
 
-        if abs(dist) <= self.TRAVEL_ACCEPTANCE_RADIUS:
+        if abs(dist) <= self.TRAVEL_ACCEPTANCE_RADIUS or self.goal_point_reached:
+            self.goal_point_reached = True
+
             if g_theta is None:
                 # No angle pose set, goal is reached
                 self.goal_reached = True
