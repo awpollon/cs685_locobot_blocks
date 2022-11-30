@@ -228,11 +228,13 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
             block_bearing += 0.099
-            block_range -= 0.35
+            block_range -= 0.31
 
             print("Here", block_bearing, block_range)
-            if abs(block_bearing) < 0.05 and abs(block_range) < 0.005:
+            if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
                 print("Aligned")
+                self.arm.go_to_home_pose()
+                self.arm.set_ee_cartesian_trajectory(z=-0.25)
                 self.__command(0, 0)
                 return True
             else:
@@ -243,7 +245,7 @@ class BlockBot(InterbotixLocobotXS):
                     if 0 < theta < math.pi/18.0:
                         theta = math.pi/18.0
 
-                if abs(block_range) < 0.005:
+                if abs(block_range) < 0.02:
                     x = 0
                 else:
                     x = x_align_controller.step(block_range)
