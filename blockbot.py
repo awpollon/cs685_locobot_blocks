@@ -233,8 +233,6 @@ class BlockBot(InterbotixLocobotXS):
             print("Here", block_bearing, block_range)
             if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
                 print("Aligned")
-                self.arm.go_to_home_pose()
-                self.arm.set_ee_cartesian_trajectory(z=-0.25)
                 self.__command(0, 0)
                 return True
             else:
