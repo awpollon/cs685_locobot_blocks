@@ -18,6 +18,7 @@ class RobotActionState(Enum):
     RELEASE_BLOCK = 6
     RETURN_HOME = 7
 
+
 MAX_X_VEL = .2
 MAX_THETA_VEL = 3*math.pi/4
 
@@ -34,6 +35,10 @@ CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0
 BLOCK_TRAVEL_RADIUS = 0.40
 GRABBABLE_APRILTAG_Z = 0.5
 GRABBABLE_MARGIN = [-0.01, 0.01]
+
+ALIGN_BEARING_ACCEPTANCE = 0.05
+ALIGN_RADIUS_ACCEPTANCE = 0.02
+
 
 CONTROL_LOOP_LIMIT = 500
 
@@ -151,6 +156,9 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.WAIT
 
     def find_goal(self, type="block"):
+        if self.v:
+            print("Searching for block.")
+
         self.action_state = RobotActionState.SEARCH_FOR_BLOCK
         self.camera.move("tilt", CAMERA_SETTINGS["search_tilt"])
 
@@ -177,7 +185,9 @@ class BlockBot(InterbotixLocobotXS):
         block_bearing, block_range = block_bearing_range
         est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
 
-        print(f"Block estimated at {est_block_x}, {est_block_y}")
+        if self.v:
+            print("Starting travel to block.")
+            print(f"Block estimated at {est_block_x}, {est_block_y}")
 
         # Move to point near block, don't rotate to any particular goal angle
         dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
@@ -208,19 +218,19 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
             block_bearing += 0.099
-            block_range -= 0.325
+            block_range -= 0.32
 
-            if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
+            if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE and abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
                 print("Aligned")
                 self.__command(0, 0)
                 return True
             else:
-                if abs(block_bearing) < 0.05:
+                if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE:
                     theta = 0
                 else:
                     theta = theta_align_controller.step(block_bearing)
 
-                if abs(block_range) < 0.02:
+                if abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
                     x = 0
                 else:
                     x = x_align_controller.step(block_range)
