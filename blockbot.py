@@ -64,8 +64,6 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
 
-#        self.theta_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
-
     def initialize_robot(self, align_camera):
         if align_camera:
             self.camera.move("pan", CAMERA_SETTINGS["pan"])
@@ -135,7 +133,6 @@ class BlockBot(InterbotixLocobotXS):
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
-#        self.move(0, 2*ROTATION_INCREMENT, 1)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
