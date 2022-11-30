@@ -24,7 +24,7 @@ class LocobotController():
     GOAL_THETA_MARGIN = math.pi/36
     # HEADING_THRESHOLD = math.pi/8
 
-    MIN_THETA_VEL = math.pi/18
+    # MIN_THETA_VEL = math.pi/18
 
     def __init__(self, goal_pose=((0, 0, 0)), verbose=True) -> None:
         self.v = verbose
@@ -37,7 +37,7 @@ class LocobotController():
 
         self.goal_point_reached = False
 
-        self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.02, KD=0.1, verbose=self.v)
+        self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.01, KD=0.1, verbose=self.v)
         self.theta_vel_controller = LocobotPIDController(KP=0.7, KI=.02, KD=.2, verbose=self.v)
 
         # self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.05, verbose=self.v)
