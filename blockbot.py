@@ -208,7 +208,7 @@ class BlockBot(InterbotixLocobotXS):
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
-        x_align_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
+        x_align_controller = LocobotPIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
         theta_align_controller = LocobotPIDController(KP=0.7, KI=.1, KD=.1, verbose=self.v)
 
         camera_tilt = self.get_camera_tilt()
