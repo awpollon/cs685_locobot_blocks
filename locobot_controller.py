@@ -37,7 +37,7 @@ class LocobotController():
 
         self.goal_point_reached = False
 
-        self.x_vel_controller = LocobotPIDController(KP=0.5, KI=.01, KD=0, verbose=self.v)
+        self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.01, KD=0, verbose=self.v)
         self.theta_vel_controller = LocobotPIDController(KP=0.5, KI=.01, KD=.1, verbose=self.v)
 
         self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
