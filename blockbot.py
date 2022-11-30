@@ -307,5 +307,5 @@ class BlockBot(InterbotixLocobotXS):
 
 
 if __name__ == "__main__":
-    blockbot = BlockBot(True, False)
+    blockbot = BlockBot(True)
     blockbot.execute_sequence()
