@@ -78,7 +78,8 @@ class LocobotController():
             else:
                 if self.v:
                     print(f"Rotating to goal pose only, theta_diff: {pose_theta_diff}")
-                x_vel = self.x_vel_pose_controller.step(dist)
+                # x_vel = self.x_vel_pose_controller.step(dist)
+                x_vel = 0
                 theta_vel = self.theta_vel_pose_controller.step(pose_theta_diff)
         else:
             # Still not at goal position
