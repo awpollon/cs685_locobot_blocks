@@ -10,7 +10,7 @@ X = symbol_shorthand.X
 PRIOR_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.01, 0.01, 0.01], dtype=float))
 ODOMETRY_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
-    np.array([0.01, 0.01, math.pi/32], dtype=float))
+    np.array([0.02, 0.02, math.pi/32], dtype=float))
 LANDMARK_NOISE = gtsam.noiseModel.Diagonal.Sigmas(
     np.array([0.5, 0.5], dtype=float))
 
