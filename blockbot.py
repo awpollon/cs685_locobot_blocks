@@ -135,7 +135,7 @@ class BlockBot(InterbotixLocobotXS):
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
-        self.move(0, 2*ROTATION_INCREMENT, 1)
+#        self.move(0, 2*ROTATION_INCREMENT, 1)
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
         self.gripper.close()
@@ -230,7 +230,6 @@ class BlockBot(InterbotixLocobotXS):
             block_bearing += 0.099
             block_range -= 0.325
 
-            print("Here", block_bearing, block_range)
             if abs(block_bearing) < 0.05 and abs(block_range) < 0.02:
                 print("Aligned")
                 self.__command(0, 0)
@@ -297,8 +296,6 @@ class BlockBot(InterbotixLocobotXS):
 
         if not self.align_with_block():
             return
-
-        return
 
         if not self.grab_block():
             return
