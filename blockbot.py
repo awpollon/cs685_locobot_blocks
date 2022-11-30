@@ -228,7 +228,7 @@ class BlockBot(InterbotixLocobotXS):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
             block_bearing += 0.099
-            block_range = block_range -= 0.35
+            block_range -= 0.35
 
             if -0.05 < block_bearing < 0.05 and -0.02 < block_range < 0.02:
                 print("Aligned")
