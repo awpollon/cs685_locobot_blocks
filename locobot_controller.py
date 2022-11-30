@@ -40,8 +40,8 @@ class LocobotController():
         self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.01, KD=0, verbose=self.v)
         self.theta_vel_controller = LocobotPIDController(KP=0.5, KI=.01, KD=.1, verbose=self.v)
 
-        self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.1, verbose=self.v)
-        self.theta_vel_pose_controller = LocobotPIDController(KP=0.7, KI=.1, KD=.1, verbose=self.v)
+        # self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.05, verbose=self.v)
+        self.theta_vel_pose_controller = LocobotPIDController(KP=0.7, KI=.05, KD=.1, verbose=self.v)
 
     def step(self, current_pose):
         if self.goal_reached:
