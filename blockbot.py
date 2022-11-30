@@ -8,6 +8,7 @@ from localizer import BlockBotLocalizer, calc_pos_from_bearing_range, calc_beari
 from locobot_controller import LocobotController
 from pid_controller import LocobotPIDController
 
+
 class RobotActionState(Enum):
     WAIT = 0
     SEARCH_FOR_BLOCK = 1
@@ -64,7 +65,7 @@ class BlockBot(InterbotixLocobotXS):
         self.block_tag_data = None
         self.bin_tag_data = None
         self.found_block = False
-        self.controller =  LocobotController(verbose=self.v)
+        self.controller = LocobotController(verbose=self.v)
 
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
