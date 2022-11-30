@@ -232,10 +232,10 @@ class BlockBot(InterbotixLocobotXS):
             else:
 #                print("Here", block_bearing, self.theta_align_controller.step(block_bearing))
                 theta = self.theta_align_controller.step(block_bearing)
-                if 0 < theta < math.pi/12.0:
-                    theta = math.pi/12.0
+                if 0 < theta < math.pi/16.0:
+                    theta = math.pi/16.0
                 self.__command(0, theta)
-        r.sleep()
+            r.sleep()
 
         print("Loop limit reached in align_with_block")
         return False
