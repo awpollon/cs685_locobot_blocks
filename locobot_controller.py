@@ -83,8 +83,6 @@ class LocobotController():
                 # x_vel = self.x_vel_pose_controller.step(dist)
                 x_vel = 0
                 theta_vel = self.theta_vel_pose_controller.step(pose_theta_diff)
-                if 0 < abs(theta_vel) < self.MIN_THETA_VEL:
-                    theta_vel = self.MIN_THETA_VEL * abs(theta_vel) / theta_vel
         else:
             # Still not at goal position
             theta_rel = calc_angle_dist(np.arctan2(g_y - pos_y, g_x - pos_x), pos_theta)
@@ -96,6 +94,9 @@ class LocobotController():
             x_vel = self.x_vel_controller.step(abs(dist))
             theta_vel = self.theta_vel_controller.step(theta_rel)
 
+        if 0 < abs(theta_vel) < self.MIN_THETA_VEL:
+            theta_vel = self.MIN_THETA_VEL * abs(theta_vel) / theta_vel
+            
         return x_vel, theta_vel
 
     def euclidean_distanced_to_goal(self, current_pose):
