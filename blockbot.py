@@ -3,8 +3,10 @@ import rospy
 import numpy as np
 from enum import Enum
 from apriltag_ros.msg import AprilTagDetectionArray
+from geometry_msgs.msg import Pose2D
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
-from localizer import BlockBotLocalizer, calc_pos_from_bearing_range, calc_bearing_range_from_tag
+#TODO: Remove these from the localizer module?
+from localizer import calc_pos_from_bearing_range, calc_bearing_range_from_tag
 from locobot_controller import LocobotController
 from pid_controller import LocobotPIDController
 
@@ -57,18 +59,29 @@ def calc_angle_dist(theta_1, theta_2):
 class BlockBot(InterbotixLocobotXS):
     def __init__(self, align_camera=True, verbose=True) -> None:
         super().__init__("locobot_px100", "mobile_px100")
-        rospy.Subscriber("/tag_detections",
-                         AprilTagDetectionArray, self.get_tag_data)
+        rospy.Subscriber(
+            "/tag_detections",
+            AprilTagDetectionArray,
+            self.get_tag_data
+        )
+
+        rospy.Subscriber(
+            "landmark_slam/estimated_pose",
+            Pose2D,
+            self.update_position_estimate
+        )
 
         self.v = verbose
         self.tags_data = []
         self.block_tag_data = None
         self.bin_tag_data = None
         self.found_block = False
+        self.use_landmarks = True
         self.controller = LocobotController(verbose=self.v)
 
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
+        self.estimated_pose = (0, 0, 0)
 
     def initialize_robot(self, align_camera):
         if align_camera:
@@ -87,27 +100,18 @@ class BlockBot(InterbotixLocobotXS):
         self.base.reset_odom()
         rospy.sleep(1)
         print(f"Reset odom:{self.base.get_odom()}")
-        self.localizer = BlockBotLocalizer(self.base.get_odom(), use_landmarks=True, verbose=self.v)
 
-    def update_position_estimate(self):
-        '''Update localizer with current odometry and observed landmarks'''
-        odom = self.base.get_odom()
-        landmarks = [
-            tag for tag in self.tags_data if tag.id[0] in LANDMARK_TAGS]
-
-        # tilt downward is postive
-        camera_tilt = self.get_camera_tilt()
-        self.localizer.add_observation(odom, landmarks, camera_tilt)
-        self.localizer.optmize()
+    def update_position_estimate(self, pose: Pose2D):
+        self.estimated_pose = pose
 
         if self.v:
-            print("Odometry measurement")
-            print(odom)
+            # print("Odometry measurement")
+            # print(odom)
 
-            print("Covariance:")
-            print(self.localizer.current_covariance)
+            # print("Covariance:")
+            # print(self.localizer.current_covariance)
             print("Estimated pose: ")
-            print(self.localizer.estimated_pose)
+            print(self.estimated_pose)
 
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
@@ -130,12 +134,10 @@ class BlockBot(InterbotixLocobotXS):
         r = rospy.Rate(10)
         # Publish Twist at 10 Hz for duration
         while (rospy.get_time() < (time_start + duration)):
-            self.update_position_estimate()
             self.base.command_velocity(x, yaw)
             r.sleep()
         # After the duration has passed, stop
         self.base.command_velocity(0, 0)
-        self.update_position_estimate()
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
@@ -250,7 +252,6 @@ class BlockBot(InterbotixLocobotXS):
         r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
             # Ideally handled by controller, but avoiding circ dependecy
-            self.update_position_estimate()
             if (self.controller.goal_reached):
                 print("Goal reached")
                 self.__command(0, 0)
@@ -272,8 +273,8 @@ class BlockBot(InterbotixLocobotXS):
             print(f'Velocities: {x_vel} {theta_vel}')
         self.base.command_velocity(x_vel, theta_vel)
 
-    def useLandmarks(self, use):
-        self.localizer.use_landmarks = use
+    def use_landmarks(self, use):
+        self.use_landmarks = use
 
     def execute_sequence(self):
         block_bearing_range = self.find_goal("block")
@@ -303,8 +304,14 @@ class BlockBot(InterbotixLocobotXS):
         return -self.camera.info['tilt']['command']
 
     def get_estimated_pose(self):
-        estimated_pose = self.localizer.estimated_pose
-        return (estimated_pose.x(), estimated_pose.y(), estimated_pose.theta())
+        if self.use_landmarks:
+            return [
+                self.estimated_pose.x,
+                self.estimated_pose.y,
+                self.estimated_pose.theta
+            ]
+        else:
+            return self.base.get_odom()
 
 
 if __name__ == "__main__":
