@@ -35,7 +35,7 @@ MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.50
+BLOCK_TRAVEL_RADIUS = 0.35
 GRABBING_RADIUS = 0.325
 GRABBING_BEARING = 0.099
 
@@ -195,42 +195,64 @@ class BlockBot(InterbotixLocobotXS):
         else:
             return True
 
+    def get_block_bearing_range(self):
+        camera_tilt = self.get_camera_tilt()
+
+        pos = self.block_tag_data
+        if not pos:
+            print("Block out of sight")
+            return (None, None)
+
+        print(f"Block tag: {pos}")
+        print(f"Camera tilt: {camera_tilt}")
+        block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
+        print(f"Block bearing: {block_bearing}, range: {block_range}")
+
+        return block_bearing, block_range
+
     def align_with_block(self):
         if self.v:
             print("Starting block alignment.")
 
         self.camera.move("tilt", CAMERA_SETTINGS["tilt"])
+
+        # Let camera finish tilting
+        rospy.sleep(2)
+        self.block_tag_data = None
+
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
         x_align_controller = LocobotPIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
         theta_align_controller = LocobotPIDController(KP=0.7, KI=.01, KD=.1, verbose=self.v)
 
-        camera_tilt = self.get_camera_tilt()
-
         r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
-            pos = self.block_tag_data
-            block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
-            print(f"Block bearing: {block_bearing}, range: {block_range}")
-            block_bearing += GRABBING_BEARING
-            block_range -= GRABBING_RADIUS
+            block_bearing, block_range = self.get_block_bearing_range()
 
-            if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE and abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
-                print("Aligned")
-                self.__command(0, 0)
-                return True
-            else:
-                if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE:
-                    theta = 0
+            if block_bearing and block_range:
+                block_bearing += GRABBING_BEARING
+                block_range -= GRABBING_RADIUS
+
+                print(f"Modified block_range: {block_range}")
+                print(f"Modified block_bearing: {block_bearing}")
+
+
+                if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE and abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
+                    print("Aligned")
+                    self.__command(0, 0)
+                    return True
                 else:
-                    theta = theta_align_controller.step(block_bearing)
+                    if abs(block_bearing) < ALIGN_BEARING_ACCEPTANCE:
+                        theta = 0
+                    else:
+                        theta = theta_align_controller.step(block_bearing)
 
-                if abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
-                    x = 0
-                else:
-                    x = x_align_controller.step(block_range)
+                    if abs(block_range) < ALIGN_RADIUS_ACCEPTANCE:
+                        x = 0
+                    else:
+                        x = x_align_controller.step(block_range)
 
-                self.__command(x, theta)
+                    self.__command(x, theta)
             r.sleep()
 
         print("Loop limit reached in align_with_block")
@@ -263,6 +285,10 @@ class BlockBot(InterbotixLocobotXS):
 
         if self.v:
             print(f'Velocities: {x_vel} {theta_vel}')
+
+        if x_vel <= -MAX_X_VEL:
+            raise ValueError("X vel is too negative")
+
         self.base.command_velocity(x_vel, theta_vel)
 
     def use_landmarks(self, use):
@@ -293,7 +319,7 @@ class BlockBot(InterbotixLocobotXS):
         self.camera.tilt(CAMERA_SETTINGS["search_tilt"])
 
     def get_camera_tilt(self):
-        return -self.camera.info['tilt']['command']
+        return self.camera.info['tilt']['command']
 
     def get_estimated_pose(self):
         if self.use_landmarks:
