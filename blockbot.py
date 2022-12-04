@@ -35,7 +35,7 @@ MOVE_INCREMENT = 0.05
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.35
+BLOCK_TRAVEL_RADIUS = 0.50
 GRABBING_RADIUS = 0.325
 GRABBING_BEARING = 0.099
 
@@ -211,6 +211,7 @@ class BlockBot(InterbotixLocobotXS):
         for _ in range(CONTROL_LOOP_LIMIT):
             pos = self.block_tag_data
             block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
+            print(f"Block bearing: {block_bearing}, range: {block_range}")
             block_bearing += GRABBING_BEARING
             block_range -= GRABBING_RADIUS
 
