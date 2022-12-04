@@ -6,7 +6,7 @@ from apriltag_ros.msg import AprilTagDetectionArray
 from geometry_msgs.msg import Pose2D
 from interbotix_xs_modules.locobot import InterbotixLocobotXS
 #TODO: Remove these from the localizer module?
-from localizer import calc_pos_from_bearing_range, calc_bearing_range_from_tag
+from landmark_localizer.localizer import calc_pos_from_bearing_range, calc_bearing_range_from_tag
 from locobot_controller import LocobotController
 from pid_controller import LocobotPIDController
 
@@ -104,15 +104,6 @@ class BlockBot(InterbotixLocobotXS):
     def update_position_estimate(self, pose: Pose2D):
         self.estimated_pose = pose
 
-        if self.v:
-            # print("Odometry measurement")
-            # print(odom)
-
-            # print("Covariance:")
-            # print(self.localizer.current_covariance)
-            print("Estimated pose: ")
-            print(self.estimated_pose)
-
     def get_tag_data(self, data):
         self.tags_data = [tag for tag in data.detections if tag.id[0] in TAGS]
 
@@ -127,7 +118,7 @@ class BlockBot(InterbotixLocobotXS):
             self.bin_tag_data = None
 
     def move(self, x=0, yaw=0, duration=1.0):
-        '''Adapted from Interbotix API, but adding localization'''
+        '''Adapted from Interbotix API'''
         if self.v:
             print(f'Moving x={x} yaw={yaw}, dur={duration}')
         time_start = rospy.get_time()
@@ -212,7 +203,7 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
         x_align_controller = LocobotPIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
-        theta_align_controller = LocobotPIDController(KP=0.7, KI=.1, KD=.1, verbose=self.v)
+        theta_align_controller = LocobotPIDController(KP=0.7, KI=.01, KD=.1, verbose=self.v)
 
         camera_tilt = self.get_camera_tilt()
 
