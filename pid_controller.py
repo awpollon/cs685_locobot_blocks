@@ -1,7 +1,7 @@
 import rospy
 
 
-class LocobotPIDController:
+class PIDController:
     def __init__(self, KP=0, KI=0, KD=0, verbose=True) -> None:
         self.v = verbose
 
@@ -12,7 +12,7 @@ class LocobotPIDController:
         self.KI = KI
         self.KD = KD
 
-        self.it = 0
+        self.error_sum = 0
 
     def step(self, error):
         # Determine change in time
@@ -23,15 +23,19 @@ class LocobotPIDController:
 
         if self.v:
             print(f"error={error}, dt={dt}")
-        self.it += (error * self.KI * dt)
+        self.error_sum += error * dt
 
-        d = self.KD * ((error - self.last_error) / dt) if self.last_error else 0
+        i = self.KI * self.error_sum
+
+        dedt = ((error - self.last_error) / dt) if self.last_error and dt != 0 else 0
+
+        d = self.KD * dedt
 
         self.last_step_time = time
         self.last_error = error
 
-        raw_control = p + self.it + d
+        raw_control = p + i + d
         if self.v:
-            print(f"raw_control = {p} + {self.it} + {d} = {raw_control}")
+            print(f"raw_control = {p} + {i} + {d} = {raw_control}")
 
         return raw_control

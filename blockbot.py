@@ -8,7 +8,8 @@ from interbotix_xs_modules.locobot import InterbotixLocobotXS
 #TODO: Remove these from the localizer module?
 from landmark_localizer.localizer import calc_pos_from_bearing_range, calc_bearing_range_from_tag
 from locobot_controller import LocobotController
-from pid_controller import LocobotPIDController
+from pid_controller import PIDController
+from kobuki_msgs.msg import BumperEvent
 
 
 class RobotActionState(Enum):
@@ -22,7 +23,7 @@ class RobotActionState(Enum):
     RETURN_HOME = 7
 
 
-MAX_X_VEL = .2
+MAX_X_VEL = .3
 MAX_THETA_VEL = math.pi
 
 BLOCK_TAGS = [91, 685]
@@ -30,16 +31,16 @@ LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
-ROTATION_INCREMENT = math.pi/16.0
-MOVE_INCREMENT = 0.05
+ROTATION_INCREMENT = math.pi/20.0
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.35
+BLOCK_TRAVEL_RADIUS = 0.38
 GRABBING_RADIUS = 0.325
-GRABBING_BEARING = 0.099
+# GRABBING_BEARING = 0.099
+GRABBING_BEARING = 0
 
-ALIGN_BEARING_ACCEPTANCE = 0.05
+ALIGN_BEARING_ACCEPTANCE = math.pi/64
 ALIGN_RADIUS_ACCEPTANCE = 0.02
 
 
@@ -71,6 +72,12 @@ class BlockBot(InterbotixLocobotXS):
             self.update_position_estimate
         )
 
+        rospy.Subscriber(
+            "/locobot/mobile_base/events/bumper",
+            BumperEvent,
+            self.handle_bumper_event
+        )
+
         self.v = verbose
         self.tags_data = []
         self.block_tag_data = None
@@ -78,6 +85,8 @@ class BlockBot(InterbotixLocobotXS):
         self.found_block = False
         self.use_landmarks = True
         self.controller = LocobotController(verbose=self.v)
+
+        self.halt = False
 
         self.action_state = RobotActionState.WAIT
         self.initialize_robot(align_camera)
@@ -125,10 +134,10 @@ class BlockBot(InterbotixLocobotXS):
         r = rospy.Rate(10)
         # Publish Twist at 10 Hz for duration
         while (rospy.get_time() < (time_start + duration)):
-            self.base.command_velocity(x, yaw)
+            self.__command(x, yaw)
             r.sleep()
         # After the duration has passed, stop
-        self.base.command_velocity(0, 0)
+        self.__command(0, 0)
 
     def grab_block(self):
         self.action_state = RobotActionState.PICK_UP_BLOCK
@@ -156,6 +165,8 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.SEARCH_FOR_BLOCK
         self.camera.move("tilt", CAMERA_SETTINGS["search_tilt"])
 
+        self.search_rotation_direction = 1
+
         for _ in range(CONTROL_LOOP_LIMIT):
             if type == "block":
                 pos = self.block_tag_data
@@ -169,25 +180,29 @@ class BlockBot(InterbotixLocobotXS):
 
             else:
                 # No block in view, keep searching
-                self.move(0, 2 * ROTATION_INCREMENT, 0.5)
+                x, y , yaw = self.get_estimated_pose()
+                if yaw < math.pi/2 or yaw < -math.pi/2:
+                    search_rotation_direction *= -1
+
+                self.__command(0, ROTATION_INCREMENT)
 
         print("Block search limit reached")
         return None
 
     def travel_to_block(self, block_bearing_range):
         self.action_state = RobotActionState.TRAVEL_TO_BLOCK
-        block_bearing, block_range = block_bearing_range
-        est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), block_bearing, block_range)
+        est_block_x, est_block_y = self.estimate_block_position(block_bearing_range)
 
-        if self.v:
-            print("Starting travel to block.")
-            print(f"Block estimated at {est_block_x}, {est_block_y}")
+        block_bearing, _ = block_bearing_range
 
         # Move to point near block, don't rotate to any particular goal angle
         dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
         dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
 
         target_pose = (est_block_x - dx, est_block_y - dy, None)
+        if self.v:
+            print("Starting travel to block. Target pose: {target_pose}")
+
         if not self.move_to_goal(target_pose):
             print("Unable to reach block")
             self.action_state = RobotActionState.WAIT
@@ -222,8 +237,8 @@ class BlockBot(InterbotixLocobotXS):
 
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
-        x_align_controller = LocobotPIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
-        theta_align_controller = LocobotPIDController(KP=0.7, KI=.01, KD=.1, verbose=self.v)
+        x_align_controller = PIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
+        theta_align_controller = PIDController(KP=0.7, KI=.01, KD=.1, verbose=self.v)
 
         r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
@@ -280,6 +295,12 @@ class BlockBot(InterbotixLocobotXS):
         return False
 
     def __command(self, raw_x_vel, raw_theta_vel):
+        if self.halt:
+            print("HALTING")
+            self.base.command_velocity(0, 0)
+            self.halt = False
+            raise SystemError("Halt issued")
+
         x_vel = max(min(raw_x_vel, MAX_X_VEL), -MAX_X_VEL)
         theta_vel = max(min(raw_theta_vel, MAX_THETA_VEL), -MAX_THETA_VEL)
 
@@ -291,7 +312,7 @@ class BlockBot(InterbotixLocobotXS):
 
         self.base.command_velocity(x_vel, theta_vel)
 
-    def use_landmarks(self, use):
+    def set_use_landmarks(self, use):
         self.use_landmarks = use
 
     def execute_sequence(self):
@@ -330,6 +351,27 @@ class BlockBot(InterbotixLocobotXS):
             ]
         else:
             return self.base.get_odom()
+
+    def handle_bumper_event(self, event: BumperEvent):
+        self.halt = True
+
+    def estimate_block_position(self, bearing_range=None):
+        if bearing_range is None:
+            bearing_range = self.get_block_bearing_range()
+
+        if bearing_range is None:
+            return None
+
+        est_block_x, est_block_y = calc_pos_from_bearing_range(self.get_estimated_pose(), *bearing_range)
+
+        if self.v:
+            print(f"Block estimated at {est_block_x}, {est_block_y}")
+
+        return est_block_x, est_block_y
+
+
+        
+
 
 
 if __name__ == "__main__":

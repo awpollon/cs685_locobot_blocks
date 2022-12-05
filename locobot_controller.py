@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from pid_controller import LocobotPIDController
+from pid_controller import PIDController
 
 
 def calc_angle_dist(theta_1, theta_2):
@@ -37,11 +37,11 @@ class LocobotController():
 
         self.goal_point_reached = False
 
-        self.x_vel_controller = LocobotPIDController(KP=0.3, KI=.005, KD=0.3, verbose=self.v)
-        self.theta_vel_controller = LocobotPIDController(KP=0.7, KI=.02, KD=.2, verbose=self.v)
+        self.x_vel_controller = PIDController(KP=0.4, KI=.001, KD=0.15, verbose=self.v)
+        self.theta_vel_controller = PIDController(KP=0.7, KI=.02, KD=.1, verbose=self.v)
 
         # self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.05, verbose=self.v)
-        self.theta_vel_pose_controller = LocobotPIDController(KP=0.7, KI=.05, KD=.1, verbose=self.v)
+        self.theta_vel_pose_controller = PIDController(KP=0.7, KI=.05, KD=.1, verbose=self.v)
 
     def step(self, current_pose):
         if self.goal_reached:
@@ -84,7 +84,6 @@ class LocobotController():
             else:
                 if self.v:
                     print(f"Rotating to goal pose only, theta_diff: {pose_theta_diff}")
-                # x_vel = self.x_vel_pose_controller.step(dist)
                 x_vel = 0
                 theta_vel = self.theta_vel_pose_controller.step(pose_theta_diff)
         else:
@@ -94,22 +93,17 @@ class LocobotController():
             # Move towards goal position, adjusting for small heading errors
             if self.v:
                 print(f"Moving to goal, dist: {dist}, theta_diff: {theta_rel}")
+
             # Only move forward when traveling
             x_vel = self.x_vel_controller.step(abs(dist))
             theta_vel = self.theta_vel_controller.step(theta_rel)
 
-        # if 0 < abs(theta_vel) < self.MIN_THETA_VEL:
-        #     theta_vel = self.MIN_THETA_VEL * abs(theta_vel) / theta_vel
-
         return x_vel, theta_vel
-
+    
     def euclidean_distanced_to_goal(self, current_pose):
         (g_x, g_y, _) = self.goal_pose
         x, y, _ = current_pose
         dist = np.sqrt((g_y - y) ** 2 + (g_x - x) ** 2)
-
-        if g_x < x:
-            dist *= -1
 
         return dist
 
