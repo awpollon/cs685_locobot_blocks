@@ -38,7 +38,7 @@ X_BOUNDARY = 3.00
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
-BLOCK_TRAVEL_RADIUS = 0.38
+BLOCK_TRAVEL_RADIUS = 0.40
 
 GRABBING_RADIUS = 0.36
 GRABBING_BEARING = 0
@@ -258,7 +258,7 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.ALIGN_WITH_BLOCK
 
         x_align_controller = PIDController(KP=0.4, KI=.05, KD=0.05, verbose=self.v)
-        theta_align_controller = PIDController(KP=0.7, KI=.01, KD=.1, verbose=self.v)
+        theta_align_controller = PIDController(KP=0.7, KI=.01, KD=.05, verbose=self.v)
 
         r = rospy.Rate(10)
         for _ in range(CONTROL_LOOP_LIMIT):
@@ -364,7 +364,6 @@ class BlockBot(InterbotixLocobotXS):
             print(f"Returining to saved pose: {found_pose}")
             if not self.move_to_goal(found_pose):
                 return
-
 
     def get_camera_tilt(self):
         return self.camera.info['tilt']['command']
