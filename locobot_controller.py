@@ -21,7 +21,7 @@ class LocobotController():
     '''Controller for locobot'''
     TRAVEL_ACCEPTANCE_RADIUS = 0.02
     # STOP_ACCEPTANCE_RADIUS = 0.02
-    GOAL_THETA_MARGIN = math.pi/36
+    GOAL_THETA_MARGIN = math.pi/40
     # HEADING_THRESHOLD = math.pi/8
 
     # MIN_THETA_VEL = math.pi/18
@@ -41,7 +41,7 @@ class LocobotController():
         self.theta_vel_controller = PIDController(KP=0.7, KI=.02, KD=.1, verbose=self.v)
 
         # self.x_vel_pose_controller = LocobotPIDController(KP=0.4, KD=0.05, verbose=self.v)
-        self.theta_vel_pose_controller = PIDController(KP=0.7, KI=.05, KD=.1, verbose=self.v)
+        self.theta_vel_pose_controller = PIDController(KP=0.7, KI=.05, KD=.05, verbose=self.v)
 
     def step(self, current_pose):
         if self.goal_reached:
