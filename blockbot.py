@@ -26,24 +26,25 @@ class RobotActionState(Enum):
 MAX_X_VEL = .3
 MAX_THETA_VEL = math.pi
 
-BLOCK_TAGS = [91, 685]
+BLOCK_TAGS = [91, 685, 686]
 LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
-ROTATION_INCREMENT = 3 *math.pi/16
-SEARCH_INCREMENT_X  = 0.70
+ROTATION_INCREMENT = 3*math.pi/16
+SEARCH_INCREMENT_X = 0.60
+BLOCK_DETECTION_RANGE = 1.00
 X_BOUNDARY = 3.00
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
 BLOCK_TRAVEL_RADIUS = 0.38
-GRABBING_RADIUS = 0.325
+
+GRABBING_RADIUS = 0.36
 GRABBING_BEARING = 0
 
-ALIGN_BEARING_ACCEPTANCE = math.pi/64
-ALIGN_RADIUS_ACCEPTANCE = 0.02
-
+ALIGN_BEARING_ACCEPTANCE = 0.02
+ALIGN_RADIUS_ACCEPTANCE = 0.01
 
 CONTROL_LOOP_LIMIT = 500
 
@@ -144,6 +145,9 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.PICK_UP_BLOCK
         self.arm.go_to_home_pose()
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
+
+        # Move forward a touch to allow for some error
+        self.move(.05, 0, 1.5)
         self.gripper.close()
         self.arm.go_to_sleep_pose()
         self.block_tag_data = None
@@ -175,23 +179,29 @@ class BlockBot(InterbotixLocobotXS):
             if pos:
                 # Calculate block bearing and range, return
                 camera_tilt = self.get_camera_tilt()
-                return calc_bearing_range_from_tag(pos, camera_tilt)
+                block_bearing, block_range = calc_bearing_range_from_tag(pos, camera_tilt)
 
-            else:
-                # No block in current view, go to next
-                x, y, _ = self.get_estimated_pose()
-
-                if i % 3 == 0:
-                    self.move_to_goal((x, y, ROTATION_INCREMENT))
-
-                elif i % 3 == 1:
-                    self.move_to_goal((x, y, -ROTATION_INCREMENT))
+                # If block is too far, skip for now
+                if block_range < BLOCK_DETECTION_RANGE:
+                    return block_bearing, block_range
                 
-                else:
-                    if x > X_BOUNDARY:
-                        print(f"X boundary reached: {X_BOUNDARY}")
-                        return None
-                    self.move_to_goal((x + SEARCH_INCREMENT_X, y, 0))
+                print(f"Block detected, but too far. Range: {block_range}")
+
+            # No block in current view, go to next
+            x, y, _ = self.get_estimated_pose()
+
+            if i % 3 == 0:
+                self.move_to_goal((x, y, ROTATION_INCREMENT))
+
+            elif i % 3 == 1:
+                self.move_to_goal((x, y, -ROTATION_INCREMENT))
+            
+            else:
+                if x > X_BOUNDARY:
+                    print(f"X boundary reached: {X_BOUNDARY}")
+                    return None
+                self.move_to_goal((x, y, 0))
+                self.move_to_goal((x + SEARCH_INCREMENT_X, y, 0))
             
             rospy.sleep(1)
 
@@ -205,12 +215,13 @@ class BlockBot(InterbotixLocobotXS):
         block_bearing, _ = block_bearing_range
 
         # Move to point near block, don't rotate to any particular goal angle
-        dx = BLOCK_TRAVEL_RADIUS * np.cos(block_bearing)
-        dy = BLOCK_TRAVEL_RADIUS * np.sin(block_bearing)
+        dx = BLOCK_TRAVEL_RADIUS * np.sin(math.pi / 2 - block_bearing)
+        dy = BLOCK_TRAVEL_RADIUS * np.cos(math.pi / 2 - block_bearing)
 
         target_pose = (est_block_x - dx, est_block_y - dy, None)
         if self.v:
-            print("Starting travel to block. Target pose: {target_pose}")
+            print(f"Starting travel to block. Target pose: {target_pose}")
+            print(f"Block bearing/range: {block_bearing_range}")
 
         if not self.move_to_goal(target_pose):
             print("Unable to reach block")
@@ -224,7 +235,7 @@ class BlockBot(InterbotixLocobotXS):
 
         pos = self.block_tag_data
         if not pos:
-            print("Block out of sight")
+            # print("Block out of sight")
             return (None, None)
 
         print(f"Block tag: {pos}")
@@ -325,28 +336,35 @@ class BlockBot(InterbotixLocobotXS):
         self.use_landmarks = use
 
     def execute_sequence(self):
-        block_bearing_range = self.find_goal("block")
-        if block_bearing_range is None:
-            return
+        for _ in range(2):
+            block_bearing_range = self.find_goal("block")
+            if block_bearing_range is None:
+                return
 
-        if not self.travel_to_block(block_bearing_range):
-            return
+            found_pose = self.get_estimated_pose()
+            print(f"Saving pose: {found_pose}")
 
-        if not self.align_with_block():
-            return
+            if not self.travel_to_block(block_bearing_range):
+                return
 
-        if not self.grab_block():
-            return
+            if not self.align_with_block():
+                return
 
-        if not self.move_to_goal((0, 0, -math.pi)):
-            return
+            if not self.grab_block():
+                return
 
-        self.release_block()
+            if not self.move_to_goal((0, 0, -math.pi)):
+                return
 
-        # TODO: Could go back to where block was found to continue search
-        if not self.move_to_goal():
-            return
-        self.camera.tilt(CAMERA_SETTINGS["search_tilt"])
+            self.release_block()
+
+            if not self.move_to_goal():
+                return
+
+            print(f"Returining to saved pose: {found_pose}")
+            if not self.move_to_goal(found_pose):
+                return
+
 
     def get_camera_tilt(self):
         return self.camera.info['tilt']['command']
