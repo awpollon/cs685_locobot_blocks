@@ -31,13 +31,14 @@ LANDMARK_TAGS = [680, 681, 682, 683, 684, 86]
 BIN_TAG = 413
 TAGS = [*BLOCK_TAGS, *LANDMARK_TAGS, BIN_TAG]
 
-ROTATION_INCREMENT = math.pi/20.0
+ROTATION_INCREMENT = 3 *math.pi/16
+SEARCH_INCREMENT_X  = 0.70
+X_BOUNDARY = 3.00
 
 CAMERA_SETTINGS = {"tilt": 1, "search_tilt": 3*math.pi/16, "pan": 0, "height": 0.45}
 
 BLOCK_TRAVEL_RADIUS = 0.38
 GRABBING_RADIUS = 0.325
-# GRABBING_BEARING = 0.099
 GRABBING_BEARING = 0
 
 ALIGN_BEARING_ACCEPTANCE = math.pi/64
@@ -165,9 +166,7 @@ class BlockBot(InterbotixLocobotXS):
         self.action_state = RobotActionState.SEARCH_FOR_BLOCK
         self.camera.move("tilt", CAMERA_SETTINGS["search_tilt"])
 
-        self.search_rotation_direction = 1
-
-        for _ in range(CONTROL_LOOP_LIMIT):
+        for i in range(CONTROL_LOOP_LIMIT):
             if type == "block":
                 pos = self.block_tag_data
             elif type == "bin":
@@ -179,12 +178,22 @@ class BlockBot(InterbotixLocobotXS):
                 return calc_bearing_range_from_tag(pos, camera_tilt)
 
             else:
-                # No block in view, keep searching
-                x, y , yaw = self.get_estimated_pose()
-                if yaw < math.pi/2 or yaw < -math.pi/2:
-                    search_rotation_direction *= -1
+                # No block in current view, go to next
+                x, y, _ = self.get_estimated_pose()
 
-                self.__command(0, ROTATION_INCREMENT)
+                if i % 3 == 0:
+                    self.move_to_goal((x, y, ROTATION_INCREMENT))
+
+                elif i % 3 == 1:
+                    self.move_to_goal((x, y, -ROTATION_INCREMENT))
+                
+                else:
+                    if x > X_BOUNDARY:
+                        print(f"X boundary reached: {X_BOUNDARY}")
+                        return None
+                    self.move_to_goal((x + SEARCH_INCREMENT_X, y, 0))
+            
+            rospy.sleep(1)
 
         print("Block search limit reached")
         return None
