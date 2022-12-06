@@ -42,6 +42,7 @@ BLOCK_TRAVEL_RADIUS = 0.40
 
 GRABBING_RADIUS = 0.36
 GRABBING_BEARING = 0
+GRABBING_ERROR_DISTANCE = 0.05
 
 ALIGN_BEARING_ACCEPTANCE = 0.02
 ALIGN_RADIUS_ACCEPTANCE = 0.01
@@ -147,7 +148,7 @@ class BlockBot(InterbotixLocobotXS):
         self.arm.set_ee_cartesian_trajectory(z=-0.25)
 
         # Move forward a touch to allow for some error
-        self.move(.05, 0, 1.5)
+        self.move(GRABBING_ERROR_DISTANCE, 0, 1.5)
         self.gripper.close()
         self.arm.go_to_sleep_pose()
         self.block_tag_data = None
