@@ -1,0 +1,2 @@
+source /home/locobot/cs685-locobot/blockbot_ws/devel/setup.bash
+./launch-landmark-slam.sh > ../logs/landmark-slam.log 2>&1 &
